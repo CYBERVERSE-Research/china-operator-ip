@@ -79,7 +79,9 @@ jobs:
           cat release-notes.md
 
       - name: Create release
-        if: ${{ !inputs.dry_run }}
+        # 显式判定事件类型：schedule 触发时 inputs 为空，不能依赖 !inputs.dry_run
+        # 的隐式取值——一旦它被当成 false，定时发布会被静默跳过。
+        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
