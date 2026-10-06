@@ -21,6 +21,7 @@ GitHub 端设置（默认分支改名、分支保护、推分支开 PR）全部�
 | 项 | 落点 |
 |---|---|
 | 脱敏审查工具与规则 | `scripts/sanitize.sh`、`scripts/sanitize-{deny,allow}list.txt` |
+| justfile ruby 配方语法检查 | `scripts/check-ruby-recipes.py`，接进 `just check` 与 CI |
 | 只发布三家运营商，各三张表 | `operators.yaml`、`justfile` |
 | 边界运营商保留为分类边界 | `operators.yaml` 的 `publish: false`，断言在 `tests/operators_test.rb` |
 | 每三天发 Release，不写回分支 | `.github/workflows/release.yml` |

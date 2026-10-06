@@ -9,6 +9,7 @@ check: sanitize
   cargo fmt --check
   cargo clippy --locked --all-targets -- -D warnings
   cargo test --locked
+  ./scripts/check-ruby-recipes.py
   ruby tests/operators_test.rb
 
 # Desensitization review for this public repository
@@ -215,12 +216,13 @@ guard:
       failures << "#{both}: #{both_lines.length} lines != #{v4_lines.length} + #{v6_lines.length}"
     end
 
-    {v4 => Socket::AF_INET, v6 => Socket::AF_INET6}.each do |file, family|
-      lines = file == v4 ? v4_lines : v6_lines
+    [[v4, v4_lines, Socket::AF_INET], [v6, v6_lines, Socket::AF_INET6]].each do |file, lines, family|
       bad = lines.reject do |line|
-        IPAddr.new(line).family == family
-      rescue StandardError
-        false
+        begin
+          IPAddr.new(line).family == family
+        rescue StandardError
+          false
+        end
       end
       failures << "#{file}: #{bad.length} malformed prefixes (first: #{bad.first})" unless bad.empty?
     end

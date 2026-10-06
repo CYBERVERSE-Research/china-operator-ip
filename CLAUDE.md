@@ -48,7 +48,8 @@ china-operator-ip/
 ├── scripts/
 │   ├── sanitize.sh             ← 脱敏扫描器（无输出 = 通过）
 │   ├── sanitize-denylist.txt   ← 禁止出现的标识
-│   └── sanitize-allowlist.txt  ← 带理由的豁免
+│   ├── sanitize-allowlist.txt  ← 带理由的豁免
+│   └── check-ruby-recipes.py   ← 对 justfile 里的 ruby 配方跑 ruby -c
 ├── tests/operators_test.rb     ← 运营商匹配规则与发布集合的回归测试
 ├── docs/
 │   ├── STANDARD.md             ← 文档规范
@@ -95,7 +96,8 @@ china-operator-ip/
 
 ```sh
 just sanitize   # 脱敏审查
-just check      # 脱敏 + cargo fmt --check + clippy -D warnings + cargo test + ruby 运营商测试
+just check      # 脱敏 + cargo fmt --check + clippy -D warnings + cargo test
+                # + justfile ruby 配方语法检查 + ruby 运营商测试
 ```
 
 `just check` 与 CI 的两个 job 等价。完整生成（约 1 小时，需要网络）：
@@ -116,6 +118,10 @@ just package    # 汇总到 dist/ 并生成 SHA256SUMS
   1 日的间隔可能是 1~3 天。需要严格等间隔要换成另一种实现，先写 ADR。
 - **`guard` 的下限只用于拦截整体失败**（分类器产出为空），不是用来跟踪真实前缀
   数量波动的。前缀数正常浮动不要去调下限，先查生成日志。
+- **`guard`、`package`、`stat`、`all` 四个配方不在 `operators_test.rb` 的执行
+  路径上**，语法错误本来要等一小时的发布任务才暴露。`scripts/check-ruby-recipes.py`
+  对所有 ruby 配方跑 `ruby -c` 把这个缺口堵住；本机没有 ruby 时它会跳过并告警，
+  在 CI（`CI` 环境变量存在）里找不到 ruby 则直接失败。
 
 ## 自动化
 

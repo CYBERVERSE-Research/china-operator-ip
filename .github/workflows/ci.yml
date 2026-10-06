@@ -39,4 +39,5 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked
+      - run: ./scripts/check-ruby-recipes.py
       - run: ruby tests/operators_test.rb
