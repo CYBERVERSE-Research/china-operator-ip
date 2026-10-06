@@ -1,6 +1,6 @@
 # main 分支保护
 
-> 最后更新 2026-10-06 ｜ 代码基线 0ca1fbb ｜ 验证程度 未在本仓库应用（需要 admin 权限）
+> 最后更新 2026-10-06 ｜ 代码基线 cc80d20 ｜ 验证程度 已应用并核验（直推 main 实测被 GH006 拒绝）
 
 本仓库只保留 `main` 一个长期分支，且 `main` 受保护：不得直接推送、不得 force push、不得删除，所有改动经 PR 合入且 CI 必须全绿。
 
@@ -72,7 +72,7 @@ JSON
 | `required_status_checks.contexts` | `sanitize`, `test` | CI 这两个 job 不绿不能合并 |
 | `required_status_checks.strict` | `true` | 分支必须先与最新 `main` 同步 |
 | `enforce_admins` | `true` | 管理员同样不能绕过，包括直接推送 |
-| `required_approving_review_count` | `0` | 强制走 PR，但不要求他人批准（单人维护） |
+| `required_approving_review_count` | `0` | 强制走 PR，但不要求他人批准。设成 1 会把单人维护卡死——GitHub 不允许作者批准自己的 PR |
 | `dismiss_stale_reviews` | `true` | 新提交作废既有批准 |
 | `required_linear_history` | `true` | 只接受 squash / rebase，拒绝 merge commit |
 | `allow_force_pushes` | `false` | 禁止 force push |
@@ -88,6 +88,10 @@ gh api -X PATCH "repos/${REPO}" \
   -F allow_rebase_merge=false \
   -F delete_branch_on_merge=true
 ```
+
+合并动作本身**由仓库所有者在 web 界面手动点击**，见 `CONTRIBUTING.md` 铁律 6。
+注意这一条无法靠分支保护机械保证：`restrictions` 能限制谁可以推送受保护分支，但
+限制到所有者本人的账号拦不住持有该账号凭据的自动化。它是流程约束。
 
 ## 五、核验
 

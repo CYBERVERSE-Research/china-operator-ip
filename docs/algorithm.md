@@ -3,7 +3,7 @@
 状态: 已实施
 负责人: @skylineconnct
 最后更新: 2026-10-06
-代码基线: 0ca1fbb
+代码基线: cc80d20
 验证程度: 已读代码
 关联代码: src/classifier.rs, src/asn.rs, src/ip.rs
 关联决策: 无
