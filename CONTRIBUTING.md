@@ -60,7 +60,7 @@ merge。**不要**在命令行合并。
 
 ## 四、改动生成流程时的额外要求
 
-改到 `operators.yaml`、`justfile` 的生成/校验配方或 `src/` 的分类逻辑时，CI 的快速检查不足以证明生成结果正确（CI 不跑完整生成，一次完整生成约 1 小时）。合并前必须额外做一次空跑：
+改到 `operators.yaml`、`justfile` 的生成/校验配方或 `src/` 的分类逻辑时，CI 的快速检查不足以证明生成结果正确。CI 故意不跑完整生成——不是因为慢（实测 4.5 分钟），而是因为它要从外部归档站下载 4 份 RIB 快照，体积在数百 MB 到数 GB，且 collector 可用性会波动，不适合做每个 PR 都必过的门禁。合并前必须额外做一次空跑：
 
 ```sh
 gh workflow run Release -f dry_run=true --ref <你的分支>

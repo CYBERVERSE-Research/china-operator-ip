@@ -23,7 +23,7 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
       - uses: cargo-bins/cargo-binstall@main
@@ -40,7 +40,7 @@ jobs:
       - name: Generate IP lists
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 90
+          timeout_minutes: 30
           max_attempts: 3
           command: just
       - name: Package release assets
