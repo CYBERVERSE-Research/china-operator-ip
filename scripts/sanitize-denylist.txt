@@ -14,6 +14,6 @@ zdoc\.app
 purge\.jsdelivr\.net
 fossa\.io
 
-# 运维相关：内部服务与密钥文件名
-\.env\.production
-id_rsa
+# 注：凭据类文件名由扫描脚本的第 7 项（凭据文件被跟踪）和第 8 项
+# （gitignore 凭据防护）负责，不要写进这里——否则会命中 .gitignore
+# 里的防护规则本身。

@@ -20,7 +20,8 @@ files() {
       scripts/sanitize.sh|scripts/sanitize-allowlist.txt|scripts/sanitize-denylist.txt) continue ;;
       LICENSE) continue ;;   # MIT 要求保留原始版权声明，见 CLAUDE.md 铁律六
     esac
-    [ -f "$f" ] || continue
+    # 跳过符号链接：.stignore -> .gitignore，目标自己会被扫到，否则重复上报
+    [ -f "$f" ] && [ ! -L "$f" ] || continue
     grep -Iq . "$f" 2>/dev/null && printf '%s\n' "$f"
   done
 }
@@ -48,8 +49,12 @@ scan() {
   report "$label" "$out"
 }
 
-# 1. 凭据与密钥
-scan '凭据密钥' '(gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|xox[baprs]-[A-Za-z0-9-]{10,})'
+# 1. 凭据与密钥：具体的 token 形状
+scan '凭据密钥' '(gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|PuTTY-User-Key-File|xox[baprs]-[A-Za-z0-9-]{10,}|sk-ant-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{32,}|sk_(live|test)_[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_-]{35}|npm_[A-Za-z0-9]{36}|pypi-[A-Za-z0-9_-]{16,}|hf_[A-Za-z0-9]{30,}|glpat-[A-Za-z0-9_-]{20,}|dop_v1_[a-f0-9]{64}|eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.)'
+
+# 1b. URL 里内嵌的用户名:口令。~/.git-credentials 正是这个形状，
+#     一旦被粘进文档或脚本，token 就随提交公开了。
+scan 'URL 内嵌凭据' '[a-z][a-z0-9+.-]*://[A-Za-z0-9._%+-]+:[^/[:space:]@"'"'"']{6,}@'
 scan '硬编码口令' '(password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"']{8,}' i
 
 # 2. 邮箱地址
@@ -69,6 +74,19 @@ fi
 
 # 6. 生成产物不得入库
 report '生成产物被跟踪' "$(git ls-files | grep -E '^(result/|dist/|analysis/)|^(asnames\.txt|autnums\.html)$|^rib[-0-9]|^delegated-|(^|/)__pycache__/|\.pyc$' || true)"
+
+# 7. 凭据类文件不得被跟踪（.gitignore 挡不住 git add -f）
+report '凭据文件被跟踪' "$(git ls-files | grep -iE '(^|/)(\.env($|\.)|\.envrc$|\.netrc|\.npmrc$|\.git-credentials$|hosts\.yml$|credentials($|\.)|secrets?($|[._])|id_(rsa|ecdsa|ed25519)|\.(pem|key|p12|pfx|jks|keystore|token)$)' || true)"
+
+# 8. .gitignore 必须保留凭据防护段。少一条就等于给一类凭据开了口子，
+#    而这种缺失不会有任何其它地方报错。
+missing=$(for pat in '.env' '.env.*' '.envrc' '.netrc' '.npmrc' '*.pem' '*.key' '*.p12' '*.pfx' \
+                     '*.jks' '*.keystore' 'id_rsa*' 'id_ecdsa*' 'id_ed25519*' '*.gpg' '*.asc' \
+                     'secrets.*' '.secrets/' 'credentials' 'credentials.*' '.aws/' '.ssh/' \
+                     '.git-credentials' 'hosts.yml' '*.token'; do
+  grep -qxF -- "$pat" .gitignore || printf '%s\n' "缺少 .gitignore 规则: $pat"
+done)
+report 'gitignore 凭据防护' "$missing"
 
 [ "$hits" -eq 0 ] && echo "INFO> 脱敏审查通过" >&2
 exit "$hits"

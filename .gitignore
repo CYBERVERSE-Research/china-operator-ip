@@ -1,3 +1,4 @@
+# 生成产物
 asnames.txt
 autnums.html
 rib.*
@@ -9,5 +10,36 @@ release-notes.md
 analysis/
 /target/
 *.bin
+
+# 凭据：公开仓库，一律不入库。
+# 这一段由 scripts/sanitize.sh 的「gitignore 凭据防护」检查保证不被删掉。
+.env
+.env.*
+.envrc
+.netrc
+.npmrc
+.netrc.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ecdsa*
+id_ed25519*
+*.gpg
+*.asc
+secrets.*
+.secrets/
+credentials
+credentials.*
+.aws/
+.ssh/
+.git-credentials
+hosts.yml
+*.token
+
+# 工具缓存
 __pycache__/
 *.pyc

@@ -21,7 +21,10 @@ just sanitize
 | `本地路径` | 换成仓库相对路径，或 `cd "$(git rev-parse --show-toplevel)"`。没有例外 |
 | `内网地址` | 删掉。公网 CIDR 是本项目的数据内容，不会命中这一项 |
 | `禁用标识` | 换成本仓库自己的标识。清单见 `scripts/sanitize-denylist.txt` |
+| `URL 内嵌凭据` | `https://user:token@host` 形状，等同于明文 token。删掉并告知用户吊销 |
 | `生成产物被跟踪` | `git rm --cached` 并确认 `.gitignore` 覆盖该路径 |
+| `凭据文件被跟踪` | 有人用 `git add -f` 绕过了 `.gitignore`。`git rm --cached` 并告知用户吊销该凭据 |
+| `gitignore 凭据防护` | `.gitignore` 的凭据段被删了条目。按报错补回原条目，**不要**改检查脚本里的清单 |
 
 确实是误报时，往 `scripts/sanitize-allowlist.txt` 加一行，格式和理由按该文件头部的说明写，豁免范围尽量窄（优先用 `<检查项>::<片段>` 而不是全局豁免）。
 

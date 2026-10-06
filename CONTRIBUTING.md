@@ -80,10 +80,19 @@ gh run watch
 | 内网地址与内部主机名 | RFC1918 地址、`127.0.0.1`、`*.internal`、`*.local` |
 | 上游个人身份与其私有域名、镜像 | 清单见 `scripts/sanitize-denylist.txt` |
 | 生成产物 | `result/`、`dist/`、`rib-*`、`asnames.txt` 等 |
+| 凭据类文件 | `.env*`、`.netrc`、`.npmrc`、`.git-credentials`、`*.pem`、`*.key`、`id_rsa*`、`hosts.yml` 等 |
+| URL 里内嵌的口令 | `https://user:token@host/...`。`~/.git-credentials` 正是这个形状 |
 
 `LICENSE` 中的原始版权声明**必须保留**——MIT 许可证要求如此，扫描脚本已将其排除。
 
 扫描器：`scripts/sanitize.sh`，无输出即通过。新增豁免要写在 `scripts/sanitize-allowlist.txt` 并注明理由；不准为了让检查通过而随手添加片段。
+
+`.gitignore` 的「凭据」段是防 token 泄漏的第一道闸，**不准删条目**。删掉任何一条
+不会有别的地方报错，所以扫描器第 8 项逐条核对它还在不在。第 7 项另外盯着
+`git add -f` 绕过 `.gitignore` 的情况：凭据类文件一旦被跟踪就会被拦下。
+
+凭据只放在仓库外（`~/.zshrc`、`gh auth login` 管理的凭据库），不写进任何被跟踪的
+文件，也不写进提交信息。
 
 ## 六、发布
 
