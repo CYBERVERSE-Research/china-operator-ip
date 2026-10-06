@@ -1,5 +1,5 @@
 name: 功能/需求建议
-description: 建议新增运营商、格式、自动化或文档改进
+description: 建议输出格式、自动化或文档改进
 title: "[Feature]: "
 labels:
   - enhancement

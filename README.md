@@ -1,127 +1,56 @@
-<!-- Keep these links. Translations will automatically update with the README. -->
-[中文](https://zdoc.app/zh/gaoyifan/china-operator-ip) | 
-[Deutsch](https://zdoc.app/de/gaoyifan/china-operator-ip) | 
-[English](https://zdoc.app/en/gaoyifan/china-operator-ip) | 
-[Español](https://zdoc.app/es/gaoyifan/china-operator-ip) | 
-[français](https://zdoc.app/fr/gaoyifan/china-operator-ip) | 
-[日本語](https://zdoc.app/ja/gaoyifan/china-operator-ip) | 
-[한국어](https://zdoc.app/ko/gaoyifan/china-operator-ip) | 
-[Português](https://zdoc.app/pt/gaoyifan/china-operator-ip) | 
-[Русский](https://zdoc.app/ru/gaoyifan/china-operator-ip)
+# china-operator-ip
 
-# 中国运营商IP地址库
+依据 BGP 路由数据生成中国三大运营商的 IP 地址列表。
 
-依据中国网络运营商分类的IP地址库
+## 收录范围
 
-## 为什么要创建这个项目
+| 运营商 | 标识 | IPv4 | IPv6 | IPv4+IPv6 |
+|---|---|---|---|---|
+| 中国电信 | `chinanet` | `chinanet.txt` | `chinanet6.txt` | `chinanet46.txt` |
+| 中国移动 | `cmcc` | `cmcc.txt` | `cmcc6.txt` | `cmcc46.txt` |
+| 中国联通 | `unicom` | `unicom.txt` | `unicom6.txt` | `unicom46.txt` |
 
-国内在BGP/ASN数据分析和应用方面，目前主要有[ipip.net](https://www.ipip.net)等商业服务，其运营商IP库的准确度较高。
+列表为 CIDR 格式，每行一条，IPv4 与 IPv6 各自按地址排序。`stat` 给出每张表覆盖的地址总量，`SHA256SUMS` 给出资产校验值。
 
-随着互联网的持续发展，边界网关协议（BGP）成为处理大规模路由数据不可或缺的基础协议之一。通过BGP，新的IP地址（或前缀）可以在全球互联网上对外通告，并被其他自治系统学习和访问。因此，BGP数据为分析归属和运营商IP分类提供了宝贵的数据基础。
+## 获取数据
 
-不过，目前国内大部分IP库依赖[WHOIS数据库](https://ftp.apnic.net/apnic/whois/apnic.db.inetnum.gz)作为数据源。WHOIS虽然能标明IP的注册机构，但无法体现实际使用情况，这会导致一些并非运营商亲自宣告的IP地址被分类不准确。像ipip.net这样较早开始结合BGP与ASN数据进行分析的公司，能够提供较为丰富和准确的数据服务，但其高质量数据部分需要付费。
+GitHub Actions 每三天生成一次，结果发布为 [Release](../../releases) 资产。固定地址始终指向最新一次发布：
 
-在其他项目中我曾用到BGP数据，因此基于开源的想法整理和公布了这些相关代码，形成了本项目。该IP库可以灵活应用于多种场景，例如[@ustclug](https://github.com/ustclug)利用它在权威DNS服务器中进行分域解析，或者作为按运营商出口分流的参考等。
+```
+https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/download/chinanet.txt
+https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/download/chinanet6.txt
+https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/download/chinanet46.txt
+```
 
-受个人精力限制，本项目的IP覆盖率难以与商业服务商持平，特别是在部分骨干节点相关的地址上，可能会有遗漏，但这些情况一般对大多数用户影响较小。
+把 `chinanet` 换成 `cmcc` 或 `unicom` 即可取其余列表。生成结果不写入任何分支。
 
-如有建议或问题，欢迎通过[issue](https://github.com/gaoyifan/china-operator-ip/issues)反馈。
+## 分类规则
 
-## 收录的运营商
+从每个前缀的 origin ASN 沿观测到的 AS_PATH 共同后缀向上游检查，遇到最近的已知运营商 ASN 后停止归属。因此下游网络的地址会归入其共同上游运营商，而该运营商的上游 transit 不会连带获得这些地址。
 
-* 中国电信(chinanet)
-* 中国移动(cmcc)
-* 中国联通(unicom)
-* ~~中国铁通(tietong)~~<已废弃>
-* 教育网(cernet)
-* 科技网(cstnet)
-* 鹏博士(drpeng) <试验阶段>
-* 谷歌中国(googlecn) <试验阶段>
+`operators.yaml` 中 `publish: false` 的条目（教育网、科技网、鹏博士、谷歌中国）不生成列表，只作为上述停止边界；删除它们会使这些网络经电信、联通转接的地址被错误归入三大运营商列表。
 
-*P.S. 由于移动与铁通已合并，铁通集合已废弃，详见[issue #10](https://github.com/gaoyifan/china-operator-ip/issues/10)。*
+同一前缀若由多个 origin ASN 宣告，仍可能同时出现在多张表中，列表之间不保证互斥。完整规则见 [分类算法](docs/algorithm.md)。
 
-*P.S. 鹏博士集团（包括：鹏博士数据、北京电信通、长城宽带、宽带通）的IP地址并非全都由独立的自治域做宣告，目前大部分地址仍由电信、联通、科技网代为宣告。故[列表](https://github.com/gaoyifan/china-operator-ip/blob/ip-lists/drpeng.txt)中的地址仅为鹏博士拥有的部分IP地址，且这些IP同时具有电信、联通两个上级出口。详见[issue #2](https://github.com/gaoyifan/china-operator-ip/issues/2).*
+## 本地生成
 
-*P.S. `china` 采用“可信国内 BGP 分类 + 未宣告 RIR-CN 登记兜底”的组合语义。如果只需要独立基于 RIR 分配数据生成的中国地址集合，可参考 [chnroutes2](https://github.com/misakaio/chnroutes2) 项目。*
-
-运营商列表依据 BGP 路径分类：从 origin 向上检查共同路径后缀，遇到最近的已知运营商后停止。因此，教育网经电信转接的地址仍归教育网，下游网络也可归入其共同上游运营商。同一前缀若由多个 origin ASN 宣告，仍可能进入多个列表；这些列表不保证严格互斥。详细规则见 [分类算法](docs/algorithm.md#processing-steps)。
-
-## 如何获取数据
-
-### 方法1：使用预生成结果
-
-IP列表（CIDR格式）保存在仓库的[ip-lists分支](https://github.com/gaoyifan/china-operator-ip/tree/ip-lists)中，GitHub Actions每日自动更新。
+依赖：[just](https://github.com/casey/just)、[Rust 工具链](https://www.rust-lang.org/tools/install)、[bgpkit-broker](https://github.com/bgpkit/bgpkit-broker) `0.7.0`、[aria2](https://github.com/aria2/aria2)、[Ruby](https://www.ruby-lang.org)、jq。
 
 ```sh
-git clone -b ip-lists https://github.com/gaoyifan/china-operator-ip.git
+just dependency   # 构建分类器并安装 bgpkit-broker
+just              # 下载数据 → 生成列表 → 统计
+just --list       # 查看所有命令
 ```
 
-亦可通过以下站点获取：
+BGP 分类器的 Rust 源码在 `src/`，直接读取本地 `rib-*` 快照。
 
-| 运营商 | [EdgeOne Pages](https://china-operator-ip.yfgao.com) | [GitHub Pages](https://gaoyifan.github.io/china-operator-ip) |
-|---|---|---|
-| 中国 | [IPv4](https://china-operator-ip.yfgao.com/china.txt) \| [IPv6](https://china-operator-ip.yfgao.com/china6.txt) \| [IPv4+IPv6](https://china-operator-ip.yfgao.com/china46.txt) | [IPv4](https://gaoyifan.github.io/china-operator-ip/china.txt) \| [IPv6](https://gaoyifan.github.io/china-operator-ip/china6.txt) \| [IPv4+IPv6](https://gaoyifan.github.io/china-operator-ip/china46.txt) |
-| 中国电信 | [IPv4](https://china-operator-ip.yfgao.com/chinanet.txt) \| [IPv6](https://china-operator-ip.yfgao.com/chinanet6.txt) \| [IPv4+IPv6](https://china-operator-ip.yfgao.com/chinanet46.txt) | [IPv4](https://gaoyifan.github.io/china-operator-ip/chinanet.txt) \| [IPv6](https://gaoyifan.github.io/china-operator-ip/chinanet6.txt) \| [IPv4+IPv6](https://gaoyifan.github.io/china-operator-ip/chinanet46.txt) |
-| 中国移动 | [IPv4](https://china-operator-ip.yfgao.com/cmcc.txt) \| [IPv6](https://china-operator-ip.yfgao.com/cmcc6.txt) \| [IPv4+IPv6](https://china-operator-ip.yfgao.com/cmcc46.txt) | [IPv4](https://gaoyifan.github.io/china-operator-ip/cmcc.txt) \| [IPv6](https://gaoyifan.github.io/china-operator-ip/cmcc6.txt) \| [IPv4+IPv6](https://gaoyifan.github.io/china-operator-ip/cmcc46.txt) |
-| 中国联通 | [IPv4](https://china-operator-ip.yfgao.com/unicom.txt) \| [IPv6](https://china-operator-ip.yfgao.com/unicom6.txt) \| [IPv4+IPv6](https://china-operator-ip.yfgao.com/unicom46.txt) | [IPv4](https://gaoyifan.github.io/china-operator-ip/unicom.txt) \| [IPv6](https://gaoyifan.github.io/china-operator-ip/unicom6.txt) \| [IPv4+IPv6](https://gaoyifan.github.io/china-operator-ip/unicom46.txt) |
-| 教育网 | [IPv4](https://china-operator-ip.yfgao.com/cernet.txt) \| [IPv6](https://china-operator-ip.yfgao.com/cernet6.txt) \| [IPv4+IPv6](https://china-operator-ip.yfgao.com/cernet46.txt) | [IPv4](https://gaoyifan.github.io/china-operator-ip/cernet.txt) \| [IPv6](https://gaoyifan.github.io/china-operator-ip/cernet6.txt) \| [IPv4+IPv6](https://gaoyifan.github.io/china-operator-ip/cernet46.txt) |
-| 科技网 | [IPv4](https://china-operator-ip.yfgao.com/cstnet.txt) \| [IPv6](https://china-operator-ip.yfgao.com/cstnet6.txt) \| [IPv4+IPv6](https://china-operator-ip.yfgao.com/cstnet46.txt) | [IPv4](https://gaoyifan.github.io/china-operator-ip/cstnet.txt) \| [IPv6](https://gaoyifan.github.io/china-operator-ip/cstnet6.txt) \| [IPv4+IPv6](https://gaoyifan.github.io/china-operator-ip/cstnet46.txt) |
-| 鹏博士 | [IPv4](https://china-operator-ip.yfgao.com/drpeng.txt) \| [IPv6](https://china-operator-ip.yfgao.com/drpeng6.txt) \| [IPv4+IPv6](https://china-operator-ip.yfgao.com/drpeng46.txt) | [IPv4](https://gaoyifan.github.io/china-operator-ip/drpeng.txt) \| [IPv6](https://gaoyifan.github.io/china-operator-ip/drpeng6.txt) \| [IPv4+IPv6](https://gaoyifan.github.io/china-operator-ip/drpeng46.txt) |
-| 谷歌中国 | [IPv4](https://china-operator-ip.yfgao.com/googlecn.txt) \| [IPv6](https://china-operator-ip.yfgao.com/googlecn6.txt) \| [IPv4+IPv6](https://china-operator-ip.yfgao.com/googlecn46.txt) | [IPv4](https://gaoyifan.github.io/china-operator-ip/googlecn.txt) \| [IPv6](https://gaoyifan.github.io/china-operator-ip/googlecn6.txt) \| [IPv4+IPv6](https://gaoyifan.github.io/china-operator-ip/googlecn46.txt) |
-| 统计 | [stat](https://china-operator-ip.yfgao.com/stat) | [stat](https://gaoyifan.github.io/china-operator-ip/stat) |
+## 参与开发
 
-镜像说明：
-* **EdgeOne Pages**: 中国大陆境内完整镜像
-* **GitHub Pages**: 海外完整镜像 
+开发流程、提交规范与脱敏要求见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-### 方法2：从BGP数据生成
+## 维护
 
-#### 安装依赖
-
-* [just](https://github.com/casey/just?tab=readme-ov-file#installation)
-* [Rust Toolchain](https://www.rust-lang.org/tools/install)
-* [bgpkit-broker](https://github.com/bgpkit/bgpkit-broker) (`cargo install bgpkit-broker@0.7.0`)
-* [aria2](https://github.com/aria2/aria2)
-* [Ruby](https://www.ruby-lang.org)
-
-#### 生成IP列表
-
-```shell
-just
-```
-
-注：执行 `just --list` 查看所有可用的命令。
-
-对于 `china` 集合，`operators.yaml` 中的 `trusted_transit_operators` 定义可信的国内运营商。目前包括电信、移动、联通、科技网和教育网。教育网使用完整的 `cernet` 名称匹配集合，其中已经包含 AS4538、AS23910，无需再单独配置骨干 ASN。
-
-生成时会从每条 AS_PATH 的 origin 端向上检查连续的 CN 后缀。对于每个 origin ASN，只要至少一条观测路径的连续 CN 后缀中包含可信运营商 ASN，该 ASN 宣告的前缀就会进入 `china` 集合；遇到第一个非 CN 或国家未知的 ASN 后立即停止，不能跨过境外 transit 再寻找国内运营商。
-
-原有 `exclude_asn` 中可由该规则自然排除的项目已经移除，只保留仍有可信国内路径、但宣告已知境外地址段的 AS142111。
-
-`china` 集合还会读取 AFRINIC、APNIC、ARIN、LACNIC 和 RIPE NCC 的 extended delegated statistics，自动补充登记给中国组织、但所有 RIB 均未观测到具体宣告的 IPv4/IPv6 地址。任意 ASN 一旦宣告其中的地址，BGP 分类会自动接管；登记国家不能证明具体接入运营商，因此该机制不用于 `chinanet`、`cmcc` 等运营商集合。规范化登记输入会保存为隐藏的 `.china.registered.txt` 供审计。设计和数据语义见 [Issue #45 实现说明](docs/issue-45-fallback-prefixes.md)。
-
-可以用下面的命令查看生成的可信 ASN 集合：
-
-```shell
-just trusted_transit_asn china
-```
-
-BGP 分类程序的 Rust 源码位于仓库顶层的 `src/`，执行 `just dependency` 会在当前仓库构建。它直接读取本地 `rib-*` 快照，与生成规则在同一个提交和 CI 中同步修改、验证。
-
-## 社区关联项目
-
-- [Loyalsoldier/geoip](https://github.com/Loyalsoldier/geoip): 按需定制适用于 Nginx、V2Ray、Clash、Surge、sing-box 等软件的多种格式 GeoIP 文件和规则集
-- [OneOhCloud/One-GeoIP](https://github.com/OneOhCloud/one-geoip): 适用于 sing-box 的规则集
-- [fcshark-org/route-list](https://github.com/fcshark-org/route-list): 适用于 dnsmasq 的规则集
-- [zxlhhyccc/smartdns-list-scripts](https://github.com/zxlhhyccc/smartdns-list-scripts): smartdns 使用的规则集
-
-## Acknowledgments
-
-* 感谢[boj](https://ring0.me)师兄提出的[设计思路](https://github.com/ustclug/discussions/issues/79#issuecomment-267958775)
-* [bgpkit](https://bgpkit.com)
-* [University of Oregon Route Views Archive Project](http://archive.routeviews.org)
-* [GitHub Action](https://github.com/features/actions)
-* [Tencent EdgeOne](https://edgeone.ai/zh?from=github)
+本项目由 [skylineconnct.io](https://www.skylineconnct.io) 维护。
 
 ## License
 
