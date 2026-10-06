@@ -68,7 +68,7 @@ if [ -s "$denylist" ]; then
 fi
 
 # 6. 生成产物不得入库
-report '生成产物被跟踪' "$(git ls-files | grep -E '^(result/|dist/|analysis/)|^(asnames\.txt|autnums\.html)$|^rib[-0-9]|^delegated-' || true)"
+report '生成产物被跟踪' "$(git ls-files | grep -E '^(result/|dist/|analysis/)|^(asnames\.txt|autnums\.html)$|^rib[-0-9]|^delegated-|(^|/)__pycache__/|\.pyc$' || true)"
 
 [ "$hits" -eq 0 ] && echo "INFO> 脱敏审查通过" >&2
 exit "$hits"

@@ -9,3 +9,5 @@ release-notes.md
 analysis/
 /target/
 *.bin
+__pycache__/
+*.pyc
