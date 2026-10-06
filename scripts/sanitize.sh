@@ -20,7 +20,7 @@ files() {
       scripts/sanitize.sh|scripts/sanitize-allowlist.txt|scripts/sanitize-denylist.txt) continue ;;
       LICENSE) continue ;;   # MIT 要求保留原始版权声明，见 CLAUDE.md 铁律六
     esac
-    # 跳过符号链接：.stignore -> .gitignore，目标自己会被扫到，否则重复上报
+    # 跳过符号链接：链接目标若被跟踪，自己会被扫到，否则同一行重复上报
     [ -f "$f" ] && [ ! -L "$f" ] || continue
     grep -Iq . "$f" 2>/dev/null && printf '%s\n' "$f"
   done
