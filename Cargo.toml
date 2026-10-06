@@ -2,9 +2,8 @@
 name = "china-operator-ip"
 version = "0.1.0"
 edition = "2024"
-authors = ["Yifan Gao <git@yfgao.com>"]
-description = "Generate China operator IP lists from BGP RIB data"
-repository = "https://github.com/gaoyifan/china-operator-ip"
+description = "Classify China Telecom / China Mobile / China Unicom IP prefixes from BGP RIB data"
+repository = "https://github.com/CYBERVERSE-Research/china-operator-ip"
 license = "MIT"
 publish = false
 

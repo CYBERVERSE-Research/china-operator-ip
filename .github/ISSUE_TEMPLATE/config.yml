@@ -1,1 +1,8 @@
 blank_issues_enabled: true
+contact_links:
+  - name: 项目维护方
+    url: https://www.skylineconnct.io
+    about: 由 skylineconnct.io 维护
+  - name: 开发流程
+    url: https://github.com/CYBERVERSE-Research/china-operator-ip/blob/main/CONTRIBUTING.md
+    about: 提交 PR 前请先读开发流程与脱敏要求

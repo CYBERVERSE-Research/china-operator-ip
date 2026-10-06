@@ -1,4 +1,20 @@
+---
+文档类型: 算法契约
+状态: 已实施
+负责人: @skylineconnct
+最后更新: 2026-10-06
+代码基线: 0ca1fbb
+验证程度: 已读代码
+关联代码: src/classifier.rs, src/asn.rs, src/ip.rs
+关联决策: 无
+---
+
 ## Algorithm Overview
+
+> 生成流程（`just gen`）只使用 `--ignore-private-asn`、`--cache` 和
+> `--operator-asn-file`。步骤 3、6、7 描述的 `--trusted-cn-transit-file`、
+> `--exclude-foreign-upstream-only`、`--fallback-prefix-file` 仍是分类器支持的
+> CLI 能力，但当前没有运营商配置会触发它们。
 
 The built-in BGP classifier reads one or more MRT/RIB files and classifies IPv4/IPv6 prefixes by origin and shared upstream ASNs, then outputs the ranges for the ASNs provided on the command line.
 
@@ -29,9 +45,9 @@ The built-in BGP classifier reads one or more MRT/RIB files and classifies IPv4/
 
    Unless `--origin-only` is set, the algorithm uses the accumulated longest common suffix for each prefix and origin (capped to 4 ASNs, after removing consecutive duplicates). It walks this suffix from the origin toward upstream, adding ASNs to the prefix map, and stops after the first ASN in `--operator-asn-file`. This retains downstream customer coverage while preventing one operator's transit provider from also receiving its space. For example, with AS4134 and AS4538 in the operator set, a common suffix `4134 4538 24489` attributes space to AS24489 and CERNET AS4538, but not China Telecom AS4134. Divergent upstreams outside the common suffix receive no attribution.
 
-   `just operator_asns` derives this boundary set from the ASN candidates of all non-`origin_only` entries in `operators.yaml`. `just gen` supplies it for operator generation and saves it as `result/.operator-asns.txt` for audit. The set is independent of the requested target ASNs: stopping only at the requested operator would still misclassify another operator's space. Direct CLI calls without this file retain unrestricted common-suffix attribution.
+   `just operator_asns` derives this boundary set from the ASN candidates of **every** entry in `operators.yaml`, including the `publish: false` ones that get no list of their own. `just gen` supplies it for operator generation and saves it as `result/.operator-asns.txt` for audit. The set is independent of the requested target ASNs: stopping only at the requested operator would still misclassify another operator's space, and dropping the `publish: false` entries would attribute their space to whichever ISP carries their transit. Direct CLI calls without this file retain unrestricted common-suffix attribution.
 
-   Each origin of a multi-origin prefix is processed independently, so genuine multi-origin observations can still produce overlapping operator lists. No operator priority or arbitrary deduplication is applied. The `china` origin-only classification is unaffected by operator boundaries.
+   Each origin of a multi-origin prefix is processed independently, so genuine multi-origin observations can still produce overlapping operator lists. No operator priority or arbitrary deduplication is applied.
 
 5) **Build ASN → IP ranges**
    Consecutive split points define half-open intervals `[start, end)`. For each interval, a /32 (v4) or /128 (v6) lookup finds the longest covering prefix and its ASNs. Each ASN receives the interval, converted to a minimal set of CIDRs by the generic address-family implementation. The per-AS ranges are stored as `IpRange` structures to allow merging.

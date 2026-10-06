@@ -2,6 +2,20 @@ set unstable
 
 default: prepare all stat
 
+# Run every pre-merge check (desensitization review first)
+check: sanitize
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cargo fmt --check
+  cargo clippy --locked --all-targets -- -D warnings
+  cargo test --locked
+  ./scripts/check-ruby-recipes.py
+  ruby tests/operators_test.rb
+
+# Desensitization review for this public repository
+sanitize:
+  ./scripts/sanitize.sh
+
 # Install or update bgp tooling dependencies
 dependency:
   #!/usr/bin/env bash
@@ -25,36 +39,6 @@ prepare_autnums:
   awk -F'[<>]' '{print $3,$5}' autnums.html | grep '^AS' > asnames.txt
   rm -f autnums.html
   echo "INFO> asnames.txt updated ($(wc -l < asnames.txt) entries)" >&2
-
-# Download an RIR extended delegated statistics file
-prepare_registry registry url:
-  #!/usr/bin/env bash
-  set -euo pipefail
-
-  outfile="delegated-{{registry}}-extended-latest"
-  download="${outfile}.download"
-  rm -f "${download}" "${download}.aria2"
-
-  if aria2c -s 4 -x 4 -q -o "${download}" --allow-overwrite=true "{{url}}" && [[ -s "${download}" ]]; then
-    mv "${download}" "${outfile}"
-    echo "INFO> ${outfile} updated ($(wc -l < "${outfile}") records)" >&2
-  elif [[ -s "${outfile}" ]]; then
-    rm -f "${download}" "${download}.aria2"
-    echo "WARNING> failed to update ${outfile}; using cached copy ($(wc -l < "${outfile}") records)" >&2
-  else
-    rm -f "${download}" "${download}.aria2"
-    echo "ERROR> failed to update ${outfile} and no cached copy is available" >&2
-    exit 1
-  fi
-
-# Download all RIR delegated statistics
-[parallel]
-prepare_registries: \
-  (prepare_registry "afrinic" "https://ftp.afrinic.net/pub/stats/afrinic/delegated-afrinic-extended-latest") \
-  (prepare_registry "apnic" "https://ftp.apnic.net/stats/apnic/delegated-apnic-extended-latest") \
-  (prepare_registry "arin" "https://ftp.arin.net/pub/stats/arin/delegated-arin-extended-latest") \
-  (prepare_registry "lacnic" "https://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-extended-latest") \
-  (prepare_registry "ripencc" "https://ftp.ripe.net/ripe/stats/delegated-ripencc-extended-latest")
 
 # Download the latest RIB snapshot for a collector
 prepare_rib collector:
@@ -84,56 +68,13 @@ prepare_rib collector:
   stat "${outfile}"
   echo "INFO> ${outfile} ready for BGP classification" >&2
 
-# Download the latest RIB snapshots (rrc21, rrc12, route-views6)
+# Download the latest RIB snapshots (rrc00, rrc21, rrc12, route-views6)
 [parallel]
 prepare_ribs: (prepare_rib "rrc00") (prepare_rib "rrc21") (prepare_rib "rrc12") (prepare_rib "route-views6")
 
 # Prepare data for generation
 [parallel]
-prepare: prepare_autnums prepare_registries prepare_ribs
-
-# Print allocated and assigned prefixes registered to COUNTRY by any RIR
-registry_prefixes country:
-  #!/usr/bin/env ruby
-  require "ipaddr"
-
-  country = "{{country}}"
-  registries = %w[afrinic apnic arin lacnic ripencc]
-  files = registries.map { |registry| "delegated-#{registry}-extended-latest" }
-  missing = files.reject { |file| File.file?(file) && File.size?(file) }
-  abort("Missing delegated RIR files: #{missing.join(", ")}. Run 'just prepare_registries' first.") unless missing.empty?
-  prefixes = []
-
-  files.each do |file|
-    File.foreach(file) do |line|
-      _registry, record_country, type, start, value, _date, status = line.chomp.split("|", 8)
-      next unless record_country == country
-      next unless %w[allocated assigned].include?(status)
-
-      case type
-      when "ipv4"
-        current = IPAddr.new(start).to_i
-        remaining = Integer(value)
-        while remaining.positive?
-          alignment = current.zero? ? (1 << 32) : current & -current
-          block = [alignment, 1 << (remaining.bit_length - 1)].min
-          prefix_len = 32 - (block.bit_length - 1)
-          prefixes << [4, current, prefix_len, "#{IPAddr.new(current, Socket::AF_INET)}/#{prefix_len}"]
-          current += block
-          remaining -= block
-        end
-      when "ipv6"
-        prefix_len = Integer(value)
-        network = IPAddr.new("#{start}/#{prefix_len}")
-        prefixes << [6, network.to_i, prefix_len, "#{network}/#{prefix_len}"]
-      end
-    end
-  end
-
-  abort("No registered prefixes found for #{country}") if prefixes.empty?
-  prefixes.uniq.sort_by { |family, address, prefix_len, _| [family, address, prefix_len] }.each do |*_, prefix|
-    puts prefix
-  end
+prepare: prepare_autnums prepare_ribs
 
 # Print raw ASN candidates for OPERATOR based on operators.yaml
 get_asn_candidates_raw operator:
@@ -147,7 +88,6 @@ get_asn_candidates_raw operator:
   op = YAML.load_file(cfg).fetch("operators").fetch("{{operator}}")
   country = op.fetch("country")
   pattern_re = Regexp.new(op["pattern"].to_s, Regexp::IGNORECASE)
-  exclude_re = Regexp.new(op.fetch("exclude", "^$"), Regexp::IGNORECASE)
 
   File.foreach(asnames) do |line|
     line.chomp!
@@ -155,7 +95,6 @@ get_asn_candidates_raw operator:
     asn, line_country = match&.captures
     next unless line_country == country
     next unless pattern_re.match?(line)
-    next if exclude_re.match?(line)
     puts asn
   end
 
@@ -176,26 +115,6 @@ get_asn_candidates operator:
     puts asn unless exclude_asn.include?(asn)
   end
 
-# Print the trusted transit ASN set configured for OPERATOR
-trusted_transit_asn operator:
-  #!/usr/bin/env ruby
-  require "set"
-  require "yaml"
-
-  operator = "{{operator}}"
-  operators = YAML.load_file("operators.yaml").fetch("operators")
-  cfg = operators.fetch(operator)
-  trusted_operators = cfg.fetch("trusted_transit_operators", [])
-  trusted_asns = Set.new
-
-  trusted_operators.each do |trusted_operator|
-    output = IO.popen(["just", "get_asn_candidates", trusted_operator], &:read)
-    abort("Failed to get trusted transit ASNs for #{trusted_operator}") unless $?.success?
-    trusted_asns.merge(output.split)
-  end
-
-  trusted_asns.sort_by(&:to_i).each { |asn| puts asn }
-
 # Print all known operator ASNs used as shared-upstream boundaries
 operator_asns:
   #!/usr/bin/env ruby
@@ -203,56 +122,49 @@ operator_asns:
   require "yaml"
 
   asns = Set.new
-  YAML.load_file("operators.yaml").fetch("operators").each do |operator, cfg|
-    next if cfg.fetch("origin_only", false)
+  YAML.load_file("operators.yaml").fetch("operators").each_key do |operator|
     output = IO.popen(["just", "get_asn_candidates", operator], &:read)
     abort("Failed to get operator ASNs for #{operator}") unless $?.success?
     asns.merge(output.split)
   end
   asns.sort_by(&:to_i).each { |asn| puts asn }
 
-# Generate IP lists for a single operator
+# Print the operators that get published IP lists
+published_operators:
+  #!/usr/bin/env ruby
+  require "yaml"
+
+  YAML.load_file("operators.yaml").fetch("operators")
+    .select { |_, cfg| cfg.fetch("publish") }
+    .keys.sort.each { |operator| puts operator }
+
+# Generate the IPv4, IPv6 and IPv4+IPv6 lists for a single operator
 gen operator:
   #!/usr/bin/env ruby
   require "fileutils"
   require "yaml"
 
   operator = "{{operator}}"
+  cfg = YAML.load_file("operators.yaml").fetch("operators").fetch(operator)
+  abort("#{operator} is a classification boundary only and has no list") unless cfg.fetch("publish")
+
   FileUtils.mkdir_p("result")
   out, v4, v6 = %W[result/#{operator}46.txt result/#{operator}.txt result/#{operator}6.txt]
-  cfg = YAML.load_file("operators.yaml").fetch("operators").fetch(operator)
-  origin_only = cfg.fetch("origin_only", false)
 
   ribs = Dir["rib-*.{gz,bz2}"].sort
   abort("No rib-*.gz or rib-*.bz2 files found. Run 'just prepare_ribs' first.") if ribs.empty?
-  classifier = ["target/release/china-operator-ip", "--ignore-private-asn", "--cache"]
-  classifier << "--origin-only" if origin_only
-  unless origin_only
-    operator_asns = IO.popen(["just", "operator_asns"], &:read)
-    abort("Failed to get operator ASNs") unless $?.success?
-    operator_asn_path = "result/.operator-asns.txt"
-    File.write(operator_asn_path, operator_asns)
-    classifier += ["--operator-asn-file", operator_asn_path]
-  end
-  if country = cfg["registry_fallback_country"]
-    registered = IO.popen(["just", "registry_prefixes", country], &:read)
-    abort("Failed to get registered prefixes for #{country}") unless $?.success?
-    registered_path = "result/.#{operator}.registered.txt"
-    File.write(registered_path, registered)
-    classifier += ["--fallback-prefix-file", registered_path]
-  end
-  if cfg.fetch("trusted_transit_operators", []).any?
-    trusted_transit = IO.popen(["just", "trusted_transit_asn", operator], &:read)
-    abort("Failed to get trusted transit ASNs for #{operator}") unless $?.success?
-    trusted_transit_path = "result/.#{operator}.trusted-transit.txt"
-    File.write(trusted_transit_path, trusted_transit)
-    classifier += [
-      "--trusted-cn-transit-file",
-      trusted_transit_path,
-      "--asn-country-file",
-      "asnames.txt",
-    ]
-  end
+
+  operator_asns = IO.popen(["just", "operator_asns"], &:read)
+  abort("Failed to get operator ASNs") unless $?.success?
+  operator_asn_path = "result/.operator-asns.txt"
+  File.write(operator_asn_path, operator_asns)
+
+  classifier = [
+    "target/release/china-operator-ip",
+    "--ignore-private-asn",
+    "--cache",
+    "--operator-asn-file", operator_asn_path,
+  ]
   classifier += ribs.flat_map { |r| ["--mrt-file", r] }
 
   warn "INFO> #{operator} start"
@@ -265,31 +177,66 @@ gen operator:
   File.write(v6, v6_lines.join)
   warn "INFO> #{operator} done (v4=#{v4_lines.length} v6=#{v6_lines.length})"
 
-# Generate IP lists for all operators sequentially
+# Generate the lists for every published operator
 all:
   #!/usr/bin/env ruby
-  require "yaml"
+  operators = IO.popen(["just", "published_operators"], &:read).split
+  abort("Failed to read published operators") unless $?.success?
 
-  ops = YAML.load_file("operators.yaml").fetch("operators").keys.sort
-  ops.each do |op|
-    status = system("just", "gen", op)
-    exit($?.exitstatus || 1) unless status
+  operators.each do |operator|
+    exit($?.exitstatus || 1) unless system("just", "gen", operator)
   end
 
+# Validate the generated lists before they are published
 guard:
   #!/usr/bin/env ruby
-  {"china.txt" => 3000, "china6.txt" => 1000}.each do |f, min|
-    next if File.foreach("result/#{f}").count >= min
-    warn "#{f} too small"
+  require "ipaddr"
+
+  # 下限只用于拦截"分类器产出为空"这类整体失败，不用于跟踪真实前缀数量的波动。
+  min_v4, min_v6 = 500, 50
+  operators = IO.popen(["just", "published_operators"], &:read).split
+  abort("Failed to read published operators") unless $?.success?
+
+  failures = []
+  operators.each do |operator|
+    v4, v6, both = %W[result/#{operator}.txt result/#{operator}6.txt result/#{operator}46.txt]
+    missing = [v4, v6, both].reject { |f| File.file?(f) }
+    unless missing.empty?
+      failures << "#{operator}: missing #{missing.join(", ")}"
+      next
+    end
+
+    v4_lines = File.readlines(v4).map(&:strip).reject(&:empty?)
+    v6_lines = File.readlines(v6).map(&:strip).reject(&:empty?)
+    both_lines = File.readlines(both).map(&:strip).reject(&:empty?)
+
+    failures << "#{v4}: #{v4_lines.length} prefixes < #{min_v4}" if v4_lines.length < min_v4
+    failures << "#{v6}: #{v6_lines.length} prefixes < #{min_v6}" if v6_lines.length < min_v6
+    if both_lines.length != v4_lines.length + v6_lines.length
+      failures << "#{both}: #{both_lines.length} lines != #{v4_lines.length} + #{v6_lines.length}"
+    end
+
+    [[v4, v4_lines, Socket::AF_INET], [v6, v6_lines, Socket::AF_INET6]].each do |file, lines, family|
+      bad = lines.reject do |line|
+        begin
+          IPAddr.new(line).family == family
+        rescue StandardError
+          false
+        end
+      end
+      failures << "#{file}: #{bad.length} malformed prefixes (first: #{bad.first})" unless bad.empty?
+    end
+  end
+
+  unless failures.empty?
+    failures.each { |f| warn "ERROR> #{f}" }
     exit 1
   end
-  warn "INFO> guard checks passed"
+  warn "INFO> guard checks passed (#{operators.length} operators x 3 lists)"
 
 # Summarize total IPv4/IPv6 address space per operator
 stat:
   #!/usr/bin/env ruby
-  require "yaml"
-
   dir = "result"
   files = Dir.exist?(dir) ? Dir.glob("#{dir}/*.txt").sort : []
   files.reject! { |p| p.end_with?("46.txt") }
@@ -309,29 +256,24 @@ stat:
   print report
   File.write("#{dir}/stat", report)
 
-# Publish generated results into the ip-lists branch
-upload: guard
-  #!/usr/bin/env bash
-  set -euo pipefail
-  rm -f ip-lists/{.,}*.txt
-  mv result/{*,.*.txt} ip-lists
-  cd ip-lists
-  tree -H . -P "*.txt|stat" -T "China Operator IP - prebuild results" > index.html
-  git config user.name "GitHub Actions"
-  git config user.email noreply@github.com
-  git add .
-  git commit -m "update $(date +%Y-%m-%d)"
-  git push -q
-
-# Refresh CDN cache for all files in ip-lists directory
-refresh_jsdelivr repository:
+# Collect the release assets into dist/ with checksums
+package: guard
   #!/usr/bin/env ruby
-  require "net/http"
+  require "digest"
+  require "fileutils"
 
-  dir = "ip-lists"
-  abort("#{dir} directory not found") unless Dir.exist?(dir)
+  operators = IO.popen(["just", "published_operators"], &:read).split
+  abort("Failed to read published operators") unless $?.success?
 
-  Dir.children(dir).sort.each do |file|
-    warn "INFO> purging CDN cache for #{file}"
-    puts Net::HTTP.get_response(URI("https://purge.jsdelivr.net/gh/{{repository}}@#{dir}/#{file}")).inspect
-  end
+  FileUtils.rm_rf("dist")
+  FileUtils.mkdir_p("dist")
+
+  assets = operators.flat_map { |op| %W[#{op}.txt #{op}6.txt #{op}46.txt] }
+  assets << "stat" if File.file?("result/stat")
+  assets.each { |f| FileUtils.cp("result/#{f}", "dist/#{f}") }
+
+  File.write("dist/SHA256SUMS", assets.sort.map { |f|
+    "#{Digest::SHA256.file("dist/#{f}").hexdigest}  #{f}\n"
+  }.join)
+
+  warn "INFO> dist/ ready (#{assets.length} assets)"

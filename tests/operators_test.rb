@@ -35,8 +35,21 @@ Dir.mktmpdir("china-operator-ip-operators") do |dir|
     actual = output.split.sort_by(&:to_i)
     abort("#{operator}: expected #{asns}, got #{actual}") unless actual == asns
   end
+  # 边界集合必须包含不发布列表的运营商，否则教育网、科技网经电信/联通转接的
+  # 地址会被归入三大运营商列表。见 docs/algorithm.md#processing-steps。
   output, status = Open3.capture2("just", "operator_asns", chdir: dir)
   abort("Failed to get operator boundaries") unless status.success?
   abort("Incorrect operator boundaries") unless output.split == expected.values.flatten.sort_by(&:to_i)
+
+  # 只有三大运营商发布列表。
+  output, status = Open3.capture2("just", "published_operators", chdir: dir)
+  abort("Failed to get published operators") unless status.success?
+  published = output.split
+  abort("Expected only the three ISPs, got #{published}") unless published == %w[chinanet cmcc unicom]
+
+  # 边界运营商不得生成列表。
+  _out, err, status = Open3.capture3("just", "gen", "cernet", chdir: dir)
+  abort("'just gen cernet' should fail for a boundary-only operator") if status.success?
+  abort("Unexpected failure reason: #{err}") unless err.include?("boundary only")
 end
 puts "Operator ASN classification checks passed"

@@ -1,0 +1,9 @@
+# 默认 reviewer。改动落到这里列出的路径时自动请求 review。
+*                       @znz9xagcza7NKGby
+
+# 分类语义、发布流程与脱敏规则是高风险区域
+/src/                   @znz9xagcza7NKGby
+/operators.yaml         @znz9xagcza7NKGby
+/justfile               @znz9xagcza7NKGby
+/scripts/               @znz9xagcza7NKGby
+/.github/workflows/     @znz9xagcza7NKGby
