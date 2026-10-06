@@ -83,10 +83,14 @@ report '凭据文件被跟踪' "$(git ls-files | grep -iE '(^|/)(\.env($|\.)|\.e
 missing=$(for pat in '.env' '.env.*' '.envrc' '.netrc' '.npmrc' '*.pem' '*.key' '*.p12' '*.pfx' \
                      '*.jks' '*.keystore' 'id_rsa*' 'id_ecdsa*' 'id_ed25519*' '*.gpg' '*.asc' \
                      'secrets.*' '.secrets/' 'credentials' 'credentials.*' '.aws/' '.ssh/' \
-                     '.git-credentials' 'hosts.yml' '*.token'; do
+                     '.git-credentials' 'hosts.yml' '*.token' '.claude/'; do
   grep -qxF -- "$pat" .gitignore || printf '%s\n' "缺少 .gitignore 规则: $pat"
 done)
 report 'gitignore 凭据防护' "$missing"
+
+# 9. agent 本地配置不得入库。本仓库公开，agent 的工作流程不对外发布，
+#    而 .gitignore 挡不住 git add -f。规则出处：CONTRIBUTING.md 五。
+report 'agent 配置被跟踪' "$(git ls-files | grep -E '^\.claude/' || true)"
 
 [ "$hits" -eq 0 ] && echo "INFO> 脱敏审查通过" >&2
 exit "$hits"

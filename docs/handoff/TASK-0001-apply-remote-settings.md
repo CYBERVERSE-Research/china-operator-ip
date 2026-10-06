@@ -1,11 +1,11 @@
 ---
 文档类型: 任务交接
-状态: 进行中
+状态: 已完成
 负责人: @znz9xagcza7NKGby
 最后更新: 2026-10-06
-代码基线: 3d4db00
-验证程度: 已读代码
-关联代码: workflows/branch-protection.md
+代码基线: cc80d20
+验证程度: 已在生产验证
+关联代码: workflows/branch-protection.md, workflows/release.md
 关联决策: 无
 ---
 
@@ -13,90 +13,49 @@
 
 ## 当前状态（一句话）
 
-仓库内的全部改动已完成并提交在 `chore/repo-standards` 分支；需要 admin 权限的
-GitHub 端设置（默认分支改名、分支保护、推分支开 PR）全部未完成，缺凭据。
+全部完成并核验：默认分支为 `main` 且受保护、远端只剩一个分支、首个 Release
+`v2026.10.06` 已发布且固定下载地址可用。
 
-## 已完成
+## 已完成（含核验值）
 
-| 项 | 落点 |
+| 步骤 | 核验结果 |
+|------|---------|
+| 默认分支改名 `master` → `main` | `default_branch: main`，`master` 已不存在 |
+| 合并方式固定 | `allow_squash_merge: true`、`allow_merge_commit: false`、`allow_rebase_merge: false`、`delete_branch_on_merge: true` |
+| 首个 PR | [#1](https://github.com/CYBERVERSE-Research/china-operator-ip/pull/1)，CI 两个 job 全绿后 squash 合并为 `cc80d20` |
+| `main` 分支保护 | 必需检查 `["sanitize","test"]`、`strict: true`、`enforce_admins: true`、批准数 `0`、`dismiss_stale_reviews: true`、线性历史、禁 force push、禁删除、讨论须解决 |
+| 直推 `main` 被拒 | `remote: error: GH006: Protected branch update failed`，提示「Changes must be made through a pull request」与「2 of 2 required status checks are expected」 |
+| 分支清理 | 远端 `["main"]` |
+| 首个 Release | `v2026.10.06`，标 Latest，11 个资产（九张表 + `stat` + `SHA256SUMS`） |
+
+## 发布流程的实测数据（2026-10-06，run 37416578982）
+
+| 项 | 值 |
 |---|---|
-| 脱敏审查工具与规则 | `scripts/sanitize.sh`、`scripts/sanitize-{deny,allow}list.txt` |
-| justfile ruby 配方语法检查 | `scripts/check-ruby-recipes.py`，接进 `just check` 与 CI |
-| 只发布三家运营商，各三张表 | `operators.yaml`、`justfile` |
-| 边界运营商保留为分类边界 | `operators.yaml` 的 `publish: false`，断言在 `tests/operators_test.rb` |
-| 每三天发 Release，不写回分支 | `.github/workflows/release.yml` |
-| PR 门禁 | `.github/workflows/ci.yml` 的 `sanitize` 与 `test` |
-| 删掉每日定时与 ip-lists 分支上传 | 原 `.github/workflows/build.yml` 已删除 |
-| 开发流程与铁律 | `CONTRIBUTING.md`、`CLAUDE.md` |
-| 文档规范与索引 | `docs/STANDARD.md`、`docs/README.md` |
-| 运行手册 | `workflows/release.md`、`workflows/branch-protection.md` |
-| Agent 命令 | `.claude/commands/` 五条 |
-| 脱敏改写与维护方变更 | `README.md`、`Cargo.toml`、`.github/ISSUE_TEMPLATE/` |
-| 本地分支改名 | `master` → `main`（本地） |
+| 整个 run | 4.5 分钟 |
+| `just dependency` | 1 分 36 秒 |
+| `prepare` + `all` + `stat` | 2 分 31 秒 |
+| `package` | 1 秒 |
+| `gh release create` | 3 秒 |
 
-## 阻塞项
+生成条目数：`chinanet` v4=2823 v6=452、`cmcc` v4=1004 v6=158、`unicom` v4=1734 v6=693。
+`just guard` 输出 `guard checks passed (3 operators x 3 lists)`，三张合表行数均等于
+对应 v4 + v6。
 
-【待确认】当前会话的 GitHub 凭据属于账号 `Wujiuuu`，对
-`CYBERVERSE-Research/china-operator-ip` 只有 `pull` 权限。已实测：
+匿名实测 `releases/latest/download/<name>` 对九张表、`stat`、`SHA256SUMS` 均返回
+HTTP 200，`sha256sum -c SHA256SUMS` 十项全部 OK。
 
-| 操作 | 结果 |
-|---|---|
-| `git push` | `403 Permission to ... denied to Wujiuuu` |
-| `POST /branches/master/rename` | `403 Must have admin access to rename the default branch` |
-| 读取分支保护 | `404`（尚未配置过） |
-
-本地 `git config user.name` / `user.email` 已按用户指定的值设好（存在
-`.git/config`，不入库——公开仓库不写邮箱，见 `CONTRIBUTING.md` §五）。但提交署名
-不提供推送凭据，所以上面三项仍然失败。
-
-解除方式二选一：
-
-```bash
-# A. 以有 admin 权限的账号登录（交互式，需要人工操作）
-gh auth login
-gh auth setup-git
-
-# B. 给现有账号加写权限
-#    在 GitHub 上把 Wujiuuu 加为该仓库的 admin
-```
-
-## 下一步（有序）
-
-| # | 做什么 | 验收标准 |
-|---|-------|---------|
-| 1 | 换成有 admin 权限的凭据 | `gh api repos/CYBERVERSE-Research/china-operator-ip --jq .permissions.admin` 为 `true` |
-| 2 | 默认分支改名 `master` → `main` | `gh api repos/... --jq .default_branch` 为 `main` |
-| 3 | 固定 squash 合并并开启合并后删分支 | `allow_merge_commit` 为 `false`，`delete_branch_on_merge` 为 `true` |
-| 4 | 推 `chore/repo-standards` 并开 PR | PR 上 `sanitize` 与 `test` 两个检查出现并通过 |
-| 5 | 合并 PR（squash） | `main` 上有本次全部改动 |
-| 6 | 配置 `main` 分支保护 | `git push --dry-run origin main` 被拒 |
-| 7 | 清理多余远端分支 | `gh api repos/.../branches --jq '[.[].name]'` 只有 `["main"]` |
-| 8 | 空跑一次 Release 验证生成流程 | `gh workflow run Release -f dry_run=true` 跑通，`just guard` 过 |
-| 9 | 等第一次定时发布，或手动发一次 | `releases/latest/download/chinanet.txt` 可下载 |
-
-第 2、3、6、7 步的逐条命令与核验命令见 `workflows/branch-protection.md`。
-第 8、9 步见 `workflows/release.md`。
-
-**注意第 6 步必须在第 5 步之后**：先配保护再合并，PR 会因为 `main` 不接受任何
-推送而卡住（`enforce_admins: true` 对管理员同样生效）。
+此前写在文档里的「一次完整生成约 1 小时」是沿用上游（8 家运营商 + 5 个 RIR 下载）
+的估计，与本仓库不符，已按实测改正，`release.yml` 的超时也从 180/90 分钟收紧到
+60/30 分钟。
 
 ## 不准动的东西
 
 - `LICENSE` 的原始版权声明。MIT 要求保留，脱敏扫描已排除该文件。
 - `operators.yaml` 里 `publish: false` 的四个条目。见 `CLAUDE.md` 铁律三。
 - 九张表的文件名。下游按 `releases/latest/download/<name>` 取数据。
+- `.claude/` 不入库。本仓库公开，agent 工作流程不对外发布，扫描第 9 项会拦住它。
 
-## 验收命令
+## 后续
 
-```bash
-REPO=CYBERVERSE-Research/china-operator-ip
-gh api "repos/${REPO}" --jq '{default_branch, allow_squash_merge, allow_merge_commit, delete_branch_on_merge}'
-gh api "repos/${REPO}/branches" --jq '[.[].name]'
-gh api "repos/${REPO}/branches/main/protection" --jq '{
-  checks: .required_status_checks.contexts,
-  admins: .enforce_admins.enabled,
-  force_push: .allow_force_pushes.enabled,
-  deletions: .allow_deletions.enabled
-}'
-git push --dry-run origin main   # 必须被拒
-```
+下一次定时发布：`0 2 */3 * *`（UTC）。排障判定表见 `workflows/release.md` 四。

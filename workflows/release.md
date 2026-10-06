@@ -1,6 +1,6 @@
 # 发布流程
 
-> 最后更新 2026-10-06 ｜ 代码基线 0ca1fbb ｜ 验证程度 已读代码，未在 Actions 跑过
+> 最后更新 2026-10-06 ｜ 代码基线 cc80d20 ｜ 验证程度 已在 Actions 完整跑通（run 37416578982，发布 v2026.10.06）
 
 九张 IP 列表由 `.github/workflows/release.yml` 每三天生成并发布为 Release 资产。
 **不手动发版，也不把结果写回任何分支。**
@@ -10,8 +10,8 @@
 | 项 | 值 |
 |---|---|
 | 触发 | cron `0 2 */3 * *`（UTC） |
-| 耗时 | 约 1 小时，job 超时 180 分钟 |
-| 重试 | 生成步骤最多 3 次，每次 90 分钟 |
+| 耗时 | 实测 4.5 分钟（2026-10-06，run 37416578982）；job 超时 60 分钟 |
+| 重试 | 生成步骤最多 3 次，每次 30 分钟 |
 | Tag | `vYYYY.MM.DD`，同日重复发布追加 `-HHMM` |
 | 资产 | 九张 `.txt` + `stat` + `SHA256SUMS` |
 | 标记 | `--latest`，所以 `releases/latest/download/<name>` 始终指向最新一次 |
@@ -62,10 +62,14 @@ gh run watch
 
 ```bash
 just dependency
-just              # prepare → all → stat，约 1 小时，需要网络
+just              # prepare → all → stat，需要网络，要下载 4 份 RIB 快照
 just guard
 just package
 ls -l dist/
 ```
+
+实测分段耗时（Actions runner，2026-10-06）：`just dependency` 1 分 36 秒、
+`prepare` + `all` + `stat` 2 分 31 秒、`package` 1 秒。本地取决于到 RIB 归档站
+的带宽，RIB 快照是几百 MB 到数 GB 量级。
 
 `dist/` 和 `result/` 都在 `.gitignore` 里，不会被提交。

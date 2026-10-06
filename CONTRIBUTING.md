@@ -8,8 +8,12 @@
 2. **不得对 `main` 执行 force push 或删除**。
 3. **只保留 `main` 一个长期分支**。生成结果通过 Release 发布，不写回任何分支。
 4. **每次动手改之前先跑脱敏审查**：`just sanitize`。有输出就先处理，不准带着命中项开始写代码。
-5. **PR 必须通过 CI 的 `sanitize` 与 `test` 两个检查**，且至少一位 reviewer 批准后才能合并。
-6. **合并方式固定为 squash**，合并后删除源分支。
+5. **PR 必须通过 CI 的 `sanitize` 与 `test` 两个检查**才能合并。分支保护没有要求
+   他人批准（`required_approving_review_count: 0`），因为仓库目前单人维护——
+   GitHub 不允许作者批准自己的 PR，设成 1 会把合并彻底卡死。
+6. **合并由仓库所有者在 GitHub web 界面上手动点击**。agent 和自动化**不准**执行
+   `gh pr merge` 或用 API 合并，工作流程止于 `gh pr create`。
+7. **合并方式固定为 squash**，合并后删除源分支。
 
 分支保护的具体配置与核验命令见 [workflows/branch-protection.md](workflows/branch-protection.md)。
 
@@ -36,11 +40,8 @@ git push -u origin HEAD
 gh pr create --base main --fill
 ```
 
-CI 全绿、review 通过后：
-
-```sh
-gh pr merge --squash --delete-branch
-```
+到此为止。把 PR 链接和 CI 状态交给仓库所有者，由其在 web 上点击 Squash and
+merge。**不要**在命令行合并。
 
 ## 三、分支与提交命名
 
@@ -59,7 +60,7 @@ gh pr merge --squash --delete-branch
 
 ## 四、改动生成流程时的额外要求
 
-改到 `operators.yaml`、`justfile` 的生成/校验配方或 `src/` 的分类逻辑时，CI 的快速检查不足以证明生成结果正确（CI 不跑完整生成，一次完整生成约 1 小时）。合并前必须额外做一次空跑：
+改到 `operators.yaml`、`justfile` 的生成/校验配方或 `src/` 的分类逻辑时，CI 的快速检查不足以证明生成结果正确。CI 故意不跑完整生成——不是因为慢（实测 4.5 分钟），而是因为它要从外部归档站下载 4 份 RIB 快照，体积在数百 MB 到数 GB，且 collector 可用性会波动，不适合做每个 PR 都必过的门禁。合并前必须额外做一次空跑：
 
 ```sh
 gh workflow run Release -f dry_run=true --ref <你的分支>

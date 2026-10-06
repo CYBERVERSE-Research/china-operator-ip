@@ -1,6 +1,10 @@
 # 默认 reviewer。改动落到这里列出的路径时自动请求 review。
 *                       @znz9xagcza7NKGby
 
+# CLAUDE.md 是 agent 每次会话自动加载的指令来源。一个改了它的 PR 等于改 agent
+# 的行为，必须逐字读过再合并。
+/CLAUDE.md              @znz9xagcza7NKGby
+
 # 分类语义、发布流程与脱敏规则是高风险区域
 /src/                   @znz9xagcza7NKGby
 /operators.yaml         @znz9xagcza7NKGby

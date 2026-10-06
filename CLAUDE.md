@@ -58,7 +58,6 @@ china-operator-ip/
 ├── workflows/
 │   ├── release.md              ← 发布流程与排障
 │   └── branch-protection.md    ← main 分支保护配置与核验
-├── .claude/commands/           ← /sanitize /check /gen /release /pr
 └── .github/
     ├── workflows/ci.yml        ← PR 门禁：sanitize + test
     ├── workflows/release.yml   ← 每三天发布一次
@@ -69,8 +68,10 @@ china-operator-ip/
 ## 铁律
 
 1. **动手前先 `just sanitize`**。这是公开仓库，命中项先清掉再写代码。
-2. **不直接推 `main`**。一切改动走 PR，squash 合并，CI 的 `sanitize` 与 `test`
-   必须绿。只保留 `main` 一个长期分支。
+2. **不直接推 `main`，也不自己合并 PR**。一切改动走 PR，CI 的 `sanitize` 与
+   `test` 必须绿，然后**由仓库所有者在 GitHub web 上手动点击 Squash and merge**。
+   你的流程止于 `gh pr create`——不准执行 `gh pr merge`，不准用 API 合并。
+   只保留 `main` 一个长期分支。
 3. **`operators.yaml` 里 `publish: false` 的条目不准删**。归属算法从 origin 向
    上游走共同路径后缀，遇到最近的已知运营商 ASN 后停止；教育网、科技网、鹏博士、
    谷歌中国正是这些停止边界。删掉它们，这些网络经电信/联通转接的地址会被归入
@@ -87,7 +88,8 @@ china-operator-ip/
    `<operator>46.txt`，加上 `stat` 与 `SHA256SUMS`。下游按
    `releases/latest/download/<name>` 取数据，改名就是破坏兼容性。
 8. **改生成流程要先空跑**。动到 `operators.yaml`、`justfile` 的生成/校验配方或
-   `src/` 的分类逻辑时，CI 的快速检查证明不了生成结果正确（CI 不跑完整生成）。
+   `src/` 的分类逻辑时，CI 的快速检查证明不了生成结果正确。CI 不跑完整生成不是
+   因为慢（实测 4.5 分钟），是因为它依赖从外部归档站下载数 GB 的 RIB 快照。
    合并前跑 `gh workflow run Release -f dry_run=true --ref <分支>`，把 run 链接
    贴进 PR。
 9. **先记录决策再实现**。改动分类语义、发布节奏、输出文件集合，先按
@@ -102,7 +104,8 @@ just check      # 脱敏 + cargo fmt --check + clippy -D warnings + cargo test
                 # + justfile ruby 配方语法检查 + ruby 运营商测试
 ```
 
-`just check` 与 CI 的两个 job 等价。完整生成（约 1 小时，需要网络）：
+`just check` 与 CI 的两个 job 等价。完整生成（需要网络，要下载 4 份 RIB 快照；
+Actions 上实测 4.5 分钟）：
 
 ```sh
 just            # prepare → all → stat
@@ -134,12 +137,17 @@ just package    # 汇总到 dist/ 并生成 SHA256SUMS
 
 `Release` 手动触发支持 `dry_run=true`：完整生成并校验，但不创建 Release。
 
-## Agent 命令
+## Agent 本地配置
 
-| 命令 | 用途 |
-|------|------|
-| `/sanitize` | 跑脱敏审查并逐条处理命中项 |
-| `/check` | 跑合并前的全部本地检查 |
-| `/gen` | 本地完整生成一次九张表 |
-| `/release` | 查看发布状态，或手动触发一次发布/空跑 |
-| `/pr` | 按本仓库流程开一个 PR |
+`.claude/` **不入库**（在 `.gitignore` 里，脱敏扫描第 9 项也会拦住它被跟踪）。
+本仓库公开，agent 的工作流程不对外发布。
+
+所以别指望克隆下来就有 slash command。每条流程的权威出处都在仓库里：
+
+| 要做的事 | 看 |
+|---|---|
+| 脱敏审查与命中项处理 | `CONTRIBUTING.md` 五 |
+| 合并前自检 | 本文件「本地自检」 |
+| 本地完整生成 | `workflows/release.md` 五 |
+| 发布状态与手动触发 | `workflows/release.md` 三 |
+| 开 PR 的完整顺序 | `CONTRIBUTING.md` 二 |
