@@ -3,7 +3,7 @@
 状态: 已批准
 负责人: @skylineconnct
 最后更新: 2026-10-06
-代码基线: 3d4db00
+代码基线: cc80d20
 验证程度: 已读代码
 关联代码: 无
 关联决策: 无
@@ -54,5 +54,5 @@
 | 九张表是什么、从哪取 | `../README.md` |
 | 发布怎么跑、出故障怎么查 | `../workflows/release.md` |
 | `main` 分支保护怎么配、怎么核验 | `../workflows/branch-protection.md` |
-| `/sanitize` `/check` `/gen` `/release` `/pr` 的执行步骤 | `../.claude/commands/` |
+| 脱敏审查、自检、生成、发布、开 PR 的步骤 | `../CONTRIBUTING.md`、`../CLAUDE.md`、`../workflows/release.md`（`.claude/` 不入库）|
 | 运营商匹配规则的回归断言 | `../tests/operators_test.rb` |

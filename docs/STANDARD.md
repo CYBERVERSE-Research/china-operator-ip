@@ -3,7 +3,7 @@
 状态: 已批准
 负责人: @skylineconnct
 最后更新: 2026-10-06
-代码基线: 0ca1fbb
+代码基线: cc80d20
 验证程度: 已读代码
 关联代码: 无
 关联决策: 无
@@ -24,7 +24,6 @@
 | 方案设计 | `docs/design/*.md` | 承接开发的 agent | 要实现什么、配置/输出长什么样 |
 | 算法契约 | `docs/algorithm.md` | 改 `src/` 的人 | 分类逐步怎么算，输入输出是什么 |
 | 运行手册 | `workflows/*.md` | 值班的人或 agent | 发布怎么跑、出故障怎么查 |
-| 单条命令 | `.claude/commands/*.md` | agent（`/xxx` 调用） | 这一条命令按什么顺序执行 |
 | 任务交接 | `docs/handoff/TASK-NNNN-*.md` | 下一个接手的 agent | 做到哪了、下一步做什么、卡在哪 |
 
 ## 二、新事实路由规则（机械判定，按顺序命中即停）
@@ -34,9 +33,12 @@
 3. 是一次**取舍判断**（选了 A 放弃 B）→ 新建 `docs/adr/ADR-NNNN`，并在 `docs/README.md` 索引加一行。
 4. 是**还没实现的设计**（新输出格式、新数据源、新配置项）→ `docs/design/`，状态标 `草案`。
 5. 是**发布或排障步骤** → `workflows/`。
-6. 是**一条可被 `/` 调用的固定流程** → `.claude/commands/`。
-7. 是**本次没做完、下一个 agent 要知道的进度** → `docs/handoff/`。
-8. 都不像 → 放 `docs/design/`，并在 `docs/README.md` 加索引行。**不要**把内容塞进 `CLAUDE.md`。
+6. 是**本次没做完、下一个 agent 要知道的进度** → `docs/handoff/`。
+7. 都不像 → 放 `docs/design/`，并在 `docs/README.md` 加索引行。**不要**把内容塞进 `CLAUDE.md`。
+
+`.claude/` **不入库**（本仓库公开，agent 工作流程不对外发布）。所以**不准**把一条
+流程只写在 slash command 里——它的权威出处必须落在上表的某个仓库内文件中，
+否则换台机器就丢了。
 
 ## 三、front-matter
 
@@ -48,10 +50,12 @@ front-matter **只用于 `docs/` 下的文件**。
 |------|-------------------|
 | `docs/**/*.md` | **必须有** |
 | `workflows/*.md` | **不要**。改为在标题下写一行：`> 最后更新 YYYY-MM-DD ｜ 代码基线 <sha> ｜ 验证程度 <枚举>` |
-| `.claude/commands/*.md` | **绝对不要**，见 3.2 |
+| `.claude/commands/*.md` | 不入库，但若你在本地自建，**绝对不要**加，见 3.2 |
 | `CLAUDE.md` / `README.md` / `CONTRIBUTING.md` | 不要 |
 
-### 3.2 硬规则：`.claude/commands/*.md` 的第一行是产品契约
+### 3.2 硬规则：slash command 文件的第一行是产品契约
+
+这条针对本地的 `.claude/commands/*.md`（不入库），记在这里是因为踩过一次。
 
 harness 把每个命令文件的**开头文本**当作该 slash command 的描述显示给 agent。所以：
 
@@ -66,7 +70,7 @@ harness 把每个命令文件的**开头文本**当作该 slash command 的描�
 状态: 草案 | 已批准 | 已实施 | 已废弃      # 任务交接单用: 待开始 | 进行中 | 已完成 | 已放弃
 负责人: @skylineconnct
 最后更新: 2026-10-06
-代码基线: 0ca1fbb
+代码基线: cc80d20
 验证程度: 已读代码 | 已跑测试 | 已完整生成验证
 关联代码: src/classifier.rs:57 (build)
 关联决策: ADR-0001 | 无
@@ -224,8 +228,9 @@ for f in targets:
             print('引用与符号不符',f,p+':'+str(ln),sym,'->',lines[ln-1].strip()[:60])
 PY
 
-# 4. .claude/commands/ 的第一行不准是 front-matter
-head -1 .claude/commands/*.md | grep -n '^---$' && echo "致命：命令文件被加了 front-matter"
+# 4. 本地 slash command（若存在，不入库）第一行不准是 front-matter
+[ -d .claude/commands ] && head -1 .claude/commands/*.md | grep -n '^---$' \
+  && echo "致命：命令文件被加了 front-matter"
 ```
 
 第 1、2、3、4 条为空输出才算通过。

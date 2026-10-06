@@ -40,6 +40,9 @@ credentials.*
 hosts.yml
 *.token
 
+# agent 本地配置：不对外发布，见 CONTRIBUTING.md 五
+.claude/
+
 # 工具缓存
 __pycache__/
 *.pyc
