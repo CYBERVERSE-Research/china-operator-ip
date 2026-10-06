@@ -1,0 +1,92 @@
+name: Release
+
+# 每三天发布一次 IP 列表。生成结果只作为 release 资产，不写回任何分支。
+# cron 的 */3 按"日"推进，因此月末到下月 1 日的间隔可能是 1~3 天。
+on:
+  schedule:
+    - cron: '0 2 */3 * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 只生成并校验，不创建 release
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cargo-bins/cargo-binstall@main
+      - uses: extractions/setup-just@v3
+      - uses: actions/cache@v5
+        with:
+          key: ${{ runner.os }}-cargo-bin-${{ hashFiles('justfile') }}
+          restore-keys: ${{ runner.os }}-cargo-bin-
+          path: ~/.cargo/bin
+      - name: Ensure aria2 is available
+        run: command -v aria2c || sudo apt-get install -y --no-install-recommends aria2
+
+      - run: just dependency
+      - name: Generate IP lists
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 90
+          max_attempts: 3
+          command: just
+      - name: Package release assets
+        run: just package
+
+      - name: Resolve release tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          date="$(date -u +%Y.%m.%d)"
+          tag="v${date}"
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            tag="v${date}-$(date -u +%H%M)"
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release notes
+        run: |
+          set -euo pipefail
+          {
+            echo "按中国电信、中国移动、中国联通分类的 IP 列表，由 BGP RIB 快照生成。"
+            echo
+            echo "| 运营商 | IPv4 | IPv6 | IPv4+IPv6 |"
+            echo "|---|---|---|---|"
+            for op in $(just published_operators); do
+              printf '| %s | %s | %s | %s |\n' "$op" \
+                "$(wc -l < "dist/${op}.txt")" \
+                "$(wc -l < "dist/${op}6.txt")" \
+                "$(wc -l < "dist/${op}46.txt")"
+            done
+            echo
+            echo "表格中的数字是 CIDR 条目数。资产校验值见 \`SHA256SUMS\`。"
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Create release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${{ steps.tag.outputs.tag }}" \
+            --target "${{ github.sha }}" \
+            --title "IP lists ${{ steps.tag.outputs.tag }}" \
+            --notes-file release-notes.md \
+            --latest \
+            dist/*

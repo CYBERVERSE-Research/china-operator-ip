@@ -1,10 +1,11 @@
 asnames.txt
 autnums.html
-delegated-*-extended-latest
 rib.*
 rib6.*
 rib-*
 result/
+dist/
+release-notes.md
 analysis/
 /target/
 *.bin
