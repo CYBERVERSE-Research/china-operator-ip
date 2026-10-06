@@ -1,0 +1,19 @@
+# 公开仓库禁止出现的标识。每行一个正则片段（大小写不敏感）。
+# 新增条目前先确认它不会命中项目正常内容（如运营商名、ASN 描述）。
+
+# 上游作者与其个人域名/镜像
+gaoyifan
+yfgao\.com
+
+# 历史贡献者的个人域名
+ibugone\.com
+0x0\.ee
+
+# 上游使用过的第三方镜像与徽章服务
+zdoc\.app
+purge\.jsdelivr\.net
+fossa\.io
+
+# 运维相关：内部服务与密钥文件名
+\.env\.production
+id_rsa
