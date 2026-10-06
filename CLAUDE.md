@@ -69,8 +69,10 @@ china-operator-ip/
 ## 铁律
 
 1. **动手前先 `just sanitize`**。这是公开仓库，命中项先清掉再写代码。
-2. **不直接推 `main`**。一切改动走 PR，squash 合并，CI 的 `sanitize` 与 `test`
-   必须绿。只保留 `main` 一个长期分支。
+2. **不直接推 `main`，也不自己合并 PR**。一切改动走 PR，CI 的 `sanitize` 与
+   `test` 必须绿，然后**由仓库所有者在 GitHub web 上手动点击 Squash and merge**。
+   你的流程止于 `gh pr create`——不准执行 `gh pr merge`，不准用 API 合并。
+   只保留 `main` 一个长期分支。
 3. **`operators.yaml` 里 `publish: false` 的条目不准删**。归属算法从 origin 向
    上游走共同路径后缀，遇到最近的已知运营商 ASN 后停止；教育网、科技网、鹏博士、
    谷歌中国正是这些停止边界。删掉它们，这些网络经电信/联通转接的地址会被归入

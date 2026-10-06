@@ -49,12 +49,18 @@ gh pr create --base main --fill
 
 然后按 `.github/pull_request_template.md` 逐条勾选，把空跑 run 链接填进去。
 
-## 合并
+## 合并——不是你的事
 
-CI 的 `sanitize` 与 `test` 全绿后：
+**不准执行 `gh pr merge`，也不准用 API 合并。** 合并由仓库所有者在 GitHub web
+界面上手动点击 Squash and merge。
 
-```bash
-gh pr merge --squash --delete-branch
-```
+开完 PR 就停下，把这些交给用户：
 
-只用 squash。`main` 要求线性历史，merge commit 会被拒绝。
+- PR 链接
+- `gh pr checks <号>` 的结果
+- 还需要人工确认的点（例如空跑 run 链接、对外契约是否变化）
+
+然后等。不要问"要我合并吗"——答案已经是否。
+
+（合并方式在仓库设置里已固定为 squash：`allow_merge_commit` 与
+`allow_rebase_merge` 都是 `false`，且 `main` 要求线性历史。）
