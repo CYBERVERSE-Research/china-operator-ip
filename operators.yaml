@@ -1,40 +1,49 @@
+# 运营商定义。
+#
+# publish: true  —— 生成并发布 IP 列表（v4 / v6 / v4+v6 三张表）
+# publish: false —— 不生成列表，只作为共同上游归属的停止边界
+#
+# 边界条目必须保留：归属算法从 origin 向上检查共同路径后缀，遇到最近的已知
+# 运营商后停止。删掉教育网、科技网等条目，它们经电信/联通转接的地址就会被
+# 归入三大运营商列表。详见 docs/algorithm.md#processing-steps。
 operators:
-  cernet:
-    country: 'CN'
-    # CNGI also includes commercial operators; AS23911 is CERNET's Beijing IX.
-    pattern: '(cernet|^AS23911\b)'
-  china:
-    country: 'CN'
-    pattern: ''
-    origin_only: true
-    trusted_transit_operators:
-      - 'chinanet'
-      - 'cmcc'
-      - 'unicom'
-      - 'cstnet'
-      - 'cernet'
-    # AS142111 has trusted domestic paths but originates known foreign prefixes.
-    exclude_asn:
-      - '142111'
-    registry_fallback_country: 'CN'
   chinanet:
+    publish: true
+    name: '中国电信'
     country: 'CN'
     pattern: '(china ?telecom|chinanet|^AS(4847|38035|38270)\b)'
-    # The legacy CHINANET description of AS18344 refers to a Unicom network.
+    # AS18344 的 CHINANET 历史描述指向的是联通网络。
     exclude_asn:
       - '18344'
   cmcc:
+    publish: true
+    name: '中国移动'
     country: 'CN'
     pattern: '(china mobile|cmnet|tietong|CHINA RAILWAY)'
+  unicom:
+    publish: true
+    name: '中国联通'
+    country: 'CN'
+    pattern: '(unicom|cnc)'
+
+  cernet:
+    publish: false
+    name: '教育网'
+    country: 'CN'
+    # CNGI 也包含商业运营商；AS23911 是教育网的北京交换中心。
+    pattern: '(cernet|^AS23911\b)'
   cstnet:
+    publish: false
+    name: '科技网'
     country: 'CN'
     pattern: 'cstnet'
   drpeng:
+    publish: false
+    name: '鹏博士'
     country: 'CN'
     pattern: '(dxtnet|dr.?peng|gxblnet|xirang)'
   googlecn:
+    publish: false
+    name: '谷歌中国'
     country: 'CN'
     pattern: 'AS24424'
-  unicom:
-    country: 'CN'
-    pattern: '(unicom|cnc)'
