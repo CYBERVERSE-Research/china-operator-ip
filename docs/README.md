@@ -25,11 +25,11 @@
 
 ## 决策记录（ADR）
 
-目前没有 ADR。第一条按 [STANDARD.md §5.1](STANDARD.md) 的模板建到 `docs/adr/ADR-0001-*.md`，并在此表加一行。
+新 ADR 按 [STANDARD.md §5.1](STANDARD.md) 的模板建到 `docs/adr/ADR-NNNN-*.md`，并在此表加一行。
 
 | 编号 | 标题 | 状态 |
 |------|------|------|
-| — | — | — |
+| [ADR-0001](adr/ADR-0001-rename-ctcc-and-add-cn-union.md) | 电信列表改名为 ctcc，并新增三家合并表 cn | 已批准 |
 
 ## 方案设计
 
@@ -51,7 +51,7 @@
 |------|-----|
 | 不准动什么 | `../CLAUDE.md` 的「铁律」 |
 | 分支、提交、PR、脱敏、发布的硬规则 | `../CONTRIBUTING.md` |
-| 九张表是什么、从哪取 | `../README.md` |
+| 十二张表是什么、从哪取 | `../README.md` |
 | 发布怎么跑、出故障怎么查 | `../workflows/release.md` |
 | `main` 分支保护怎么配、怎么核验 | `../workflows/branch-protection.md` |
 | 脱敏审查、自检、生成、发布、开 PR 的步骤 | `../CONTRIBUTING.md`、`../CLAUDE.md`、`../workflows/release.md`（`.claude/` 不入库）|
