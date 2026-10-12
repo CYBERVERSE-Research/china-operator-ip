@@ -19,7 +19,7 @@
 |------|------|------|-----------|
 | 项目铁律 | `CLAUDE.md` | agent（每次会话自动加载） | 不准动什么、改完怎么发布 |
 | 开发流程 | `CONTRIBUTING.md` | 人 + agent | 分支、提交、PR、脱敏、发布的硬规则 |
-| 对外说明 | `README.md` | 人（第一次接触项目） | 九张表是什么、从哪取 |
+| 对外说明 | `README.md` | 人（第一次接触项目） | 十二张表是什么、从哪取 |
 | 决策记录 ADR | `docs/adr/ADR-NNNN-*.md` | agent + 人 | 为什么选 A 不选 B，代价是什么 |
 | 方案设计 | `docs/design/*.md` | 承接开发的 agent | 要实现什么、配置/输出长什么样 |
 | 算法契约 | `docs/algorithm.md` | 改 `src/` 的人 | 分类逐步怎么算，输入输出是什么 |
@@ -28,7 +28,7 @@
 
 ## 二、新事实路由规则（机械判定，按顺序命中即停）
 
-1. 改了会**破坏对外契约**的约束（九张表的文件名、CIDR 行格式、Release 资产集合、`releases/latest/download/` 地址）→ 写 `CLAUDE.md` 的「铁律」，细节另开 `docs/design/`。
+1. 改了会**破坏对外契约**的约束（十二张表的文件名、CIDR 行格式、Release 资产集合、`releases/latest/download/` 地址）→ 写 `CLAUDE.md` 的「铁律」，细节另开 `docs/design/`。
 2. 改了**分类语义**（归属边界、ASN 匹配规则、前缀合并方式）→ 更新 `docs/algorithm.md`，并在 `tests/operators_test.rb` 补回归断言。
 3. 是一次**取舍判断**（选了 A 放弃 B）→ 新建 `docs/adr/ADR-NNNN`，并在 `docs/README.md` 索引加一行。
 4. 是**还没实现的设计**（新输出格式、新数据源、新配置项）→ `docs/design/`，状态标 `草案`。

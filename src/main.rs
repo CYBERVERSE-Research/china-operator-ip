@@ -7,6 +7,7 @@ use asn::{Asn, DomesticPolicy, foreign_upstream_only, load_countries, load_set};
 use cache::CacheKey;
 use clap::{ArgAction, Parser};
 use classifier::ClassifierConfig;
+use ip::IpRanges;
 use ipnet::IpNet;
 use std::collections::HashSet;
 use std::fs::File;
@@ -41,6 +42,15 @@ struct Opts {
     #[arg(long, value_name = "COUNTRY")]
     exclude_foreign_upstream_only: Option<String>,
 
+    /// Print the union of the CIDR lists in these files, without overlaps, and exit.
+    #[arg(
+        long,
+        value_name = "FILE",
+        action = ArgAction::Append,
+        conflicts_with_all = ["mrt_files", "asns"]
+    )]
+    merge_prefix_file: Vec<PathBuf>,
+
     #[arg(long, value_name = "FILE")]
     asn_country_file: Option<PathBuf>,
 
@@ -61,6 +71,19 @@ struct Opts {
 
 fn main() {
     let opts = Opts::parse();
+    if !opts.merge_prefix_file.is_empty() {
+        let mut prefixes = Vec::new();
+        for path in &opts.merge_prefix_file {
+            prefixes.extend(load_prefixes(path).unwrap_or_else(|err| {
+                panic!("failed to load prefixes from {}: {err}", path.display())
+            }));
+        }
+        for line in IpRanges::union(&prefixes).lines() {
+            println!("{line}");
+        }
+        return;
+    }
+
     let targets: HashSet<Asn> = opts.asns.iter().copied().collect();
     let operator_asns = opts
         .operator_asn_file
@@ -224,6 +247,28 @@ mod tests {
             ])
             .is_ok()
         );
+    }
+
+    #[test]
+    fn merge_mode_takes_files_but_no_rib_or_asn() {
+        let opts = Opts::try_parse_from([
+            "china-operator-ip",
+            "--merge-prefix-file",
+            "a.txt",
+            "--merge-prefix-file",
+            "b.txt",
+        ])
+        .unwrap();
+        assert_eq!(
+            opts.merge_prefix_file,
+            [PathBuf::from("a.txt"), PathBuf::from("b.txt")]
+        );
+
+        for conflicting in [["--mrt-file", "rib.gz"], ["--", "4134"]] {
+            let mut args = vec!["china-operator-ip", "--merge-prefix-file", "a.txt"];
+            args.extend(conflicting);
+            assert!(Opts::try_parse_from(args).is_err());
+        }
     }
 
     #[test]

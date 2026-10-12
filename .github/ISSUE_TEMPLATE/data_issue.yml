@@ -23,7 +23,7 @@ body:
       label: 运营商分类
       multiple: false
       options:
-        - 中国电信（chinanet）
+        - 中国电信（ctcc）
         - 中国移动（cmcc）
         - 中国联通（unicom）
         - 不确定

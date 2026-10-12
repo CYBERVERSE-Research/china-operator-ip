@@ -67,7 +67,7 @@ gh workflow run Release -f dry_run=true --ref <你的分支>
 gh run watch
 ```
 
-空跑会完整下载数据、生成九张表并执行 `just guard`，但不会创建 Release。把 run 链接贴进 PR 描述。
+空跑会完整下载数据、生成十二张表并执行 `just guard`，但不会创建 Release。把 run 链接贴进 PR 描述。
 
 ## 五、脱敏要求
 

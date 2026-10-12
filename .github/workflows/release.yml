@@ -64,15 +64,16 @@ jobs:
           set -euo pipefail
           {
             echo "按中国电信、中国移动、中国联通分类的 IP 列表，由 BGP RIB 快照生成。"
+            echo "\`cn\` 是三家的并集，重叠与相邻的段已合并。"
             echo
-            echo "| 运营商 | IPv4 | IPv6 | IPv4+IPv6 |"
+            echo "| 列表 | IPv4 | IPv6 | IPv4+IPv6 |"
             echo "|---|---|---|---|"
-            for op in $(just published_operators); do
-              printf '| %s | %s | %s | %s |\n' "$op" \
-                "$(wc -l < "dist/${op}.txt")" \
-                "$(wc -l < "dist/${op}6.txt")" \
-                "$(wc -l < "dist/${op}46.txt")"
-            done
+            while read -r name v4 v6 both; do
+              printf '| %s | %s | %s | %s |\n' "$name" \
+                "$(wc -l < "dist/${v4}")" \
+                "$(wc -l < "dist/${v6}")" \
+                "$(wc -l < "dist/${both}")"
+            done < <(just published_lists)
             echo
             echo "表格中的数字是 CIDR 条目数。资产校验值见 \`SHA256SUMS\`。"
           } > release-notes.md
