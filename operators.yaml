@@ -7,7 +7,7 @@
 # 运营商后停止。删掉教育网、科技网等条目，它们经电信/联通转接的地址就会被
 # 归入三大运营商列表。详见 docs/algorithm.md#processing-steps。
 operators:
-  chinanet:
+  ctcc:
     publish: true
     name: '中国电信'
     country: 'CN'

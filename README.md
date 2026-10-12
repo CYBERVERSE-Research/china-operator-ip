@@ -6,9 +6,14 @@
 
 | 运营商 | 标识 | IPv4 | IPv6 | IPv4+IPv6 |
 |---|---|---|---|---|
-| 中国电信 | `chinanet` | `chinanet.txt` | `chinanet6.txt` | `chinanet46.txt` |
+| 中国电信 | `ctcc` | `ctcc.txt` | `ctcc6.txt` | `ctcc46.txt` |
 | 中国移动 | `cmcc` | `cmcc.txt` | `cmcc6.txt` | `cmcc46.txt` |
 | 中国联通 | `unicom` | `unicom.txt` | `unicom6.txt` | `unicom46.txt` |
+| 三家合并 | `cn` | `cnv4.txt` | `cnv6.txt` | `cnv4v6.txt` |
+
+`cn` 是三家列表的并集：重复、嵌套与相邻的段已合并，表内任意两条 CIDR 都不重叠。
+
+> 中国电信的标识在 2026-10 由 `chinanet` 改为 `ctcc`，此后的发布不再包含 `chinanet*.txt`，见 [ADR-0001](docs/adr/ADR-0001-rename-ctcc-and-add-cn-union.md)。
 
 列表为 CIDR 格式，每行一条，IPv4 与 IPv6 各自按地址排序。`stat` 给出每张表覆盖的地址总量，`SHA256SUMS` 给出资产校验值。
 
@@ -17,12 +22,12 @@
 GitHub Actions 每三天生成一次，结果发布为 [Release](../../releases) 资产。固定地址始终指向最新一次发布：
 
 ```
-https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/download/chinanet.txt
-https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/download/chinanet6.txt
-https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/download/chinanet46.txt
+https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/download/ctcc.txt
+https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/download/ctcc6.txt
+https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/download/ctcc46.txt
 ```
 
-把 `chinanet` 换成 `cmcc` 或 `unicom` 即可取其余列表。生成结果不写入任何分支。
+把 `ctcc` 换成 `cmcc` 或 `unicom` 即可取其余列表；合并表取 `cnv4.txt`、`cnv6.txt`、`cnv4v6.txt`。生成结果不写入任何分支。
 
 ## 分类规则
 
@@ -30,7 +35,7 @@ https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/downloa
 
 `operators.yaml` 中 `publish: false` 的条目（教育网、科技网、鹏博士、谷歌中国）不生成列表，只作为上述停止边界；删除它们会使这些网络经电信、联通转接的地址被错误归入三大运营商列表。
 
-同一前缀若由多个 origin ASN 宣告，仍可能同时出现在多张表中，列表之间不保证互斥。完整规则见 [分类算法](docs/algorithm.md)。
+同一前缀若由多个 origin ASN 宣告，仍可能同时出现在多张表中，三家列表之间不保证互斥；`cn` 合并时只保留一份。完整规则见 [分类算法](docs/algorithm.md)。
 
 ## 本地生成
 

@@ -1,6 +1,6 @@
 set unstable
 
-default: prepare all stat
+default: prepare all cn stat
 
 # Run every pre-merge check (desensitization review first)
 check: sanitize
@@ -187,6 +187,35 @@ all:
     exit($?.exitstatus || 1) unless system("just", "gen", operator)
   end
 
+# Merge every published operator's lists into cnv4 / cnv6 / cnv4v6, without overlaps
+cn:
+  #!/usr/bin/env ruby
+  operators = IO.popen(["just", "published_operators"], &:read).split
+  abort("Failed to read published operators") unless $?.success?
+
+  inputs = operators.map { |op| "result/#{op}46.txt" }
+  missing = inputs.reject { |f| File.file?(f) }
+  abort("Missing #{missing.join(", ")}. Run 'just all' first.") unless missing.empty?
+
+  # 重叠、嵌套、相邻的段由分类器合并成最少的 CIDR，见 docs/adr/ADR-0001-*.md。
+  out, v4, v6 = %w[result/cnv4v6.txt result/cnv4.txt result/cnv6.txt]
+  merge = ["target/release/china-operator-ip"] + inputs.flat_map { |f| ["--merge-prefix-file", f] }
+  abort("Failed to merge #{inputs.join(", ")}") unless system(*merge, out: out)
+
+  v6_lines, v4_lines = File.readlines(out).partition { |line| line.include?(":") }
+  File.write(v4, v4_lines.join)
+  File.write(v6, v6_lines.join)
+  warn "INFO> cn done from #{operators.join("+")} (v4=#{v4_lines.length} v6=#{v6_lines.length})"
+
+# Print "<list> <v4 file> <v6 file> <v4+v6 file>" for every published list
+published_lists:
+  #!/usr/bin/env ruby
+  operators = IO.popen(["just", "published_operators"], &:read).split
+  abort("Failed to read published operators") unless $?.success?
+
+  operators.each { |op| puts "#{op} #{op}.txt #{op}6.txt #{op}46.txt" }
+  puts "cn cnv4.txt cnv6.txt cnv4v6.txt"
+
 # Validate the generated lists before they are published
 guard:
   #!/usr/bin/env ruby
@@ -194,15 +223,16 @@ guard:
 
   # 下限只用于拦截"分类器产出为空"这类整体失败，不用于跟踪真实前缀数量的波动。
   min_v4, min_v6 = 500, 50
-  operators = IO.popen(["just", "published_operators"], &:read).split
-  abort("Failed to read published operators") unless $?.success?
+  lists = IO.popen(["just", "published_lists"], &:read).lines.map(&:split)
+  abort("Failed to read published lists") unless $?.success?
 
   failures = []
-  operators.each do |operator|
-    v4, v6, both = %W[result/#{operator}.txt result/#{operator}6.txt result/#{operator}46.txt]
+  counts = {}
+  lists.each do |name, *files|
+    v4, v6, both = files.map { |f| "result/#{f}" }
     missing = [v4, v6, both].reject { |f| File.file?(f) }
     unless missing.empty?
-      failures << "#{operator}: missing #{missing.join(", ")}"
+      failures << "#{name}: missing #{missing.join(", ")}"
       next
     end
 
@@ -226,20 +256,38 @@ guard:
       end
       failures << "#{file}: #{bad.length} malformed prefixes (first: #{bad.first})" unless bad.empty?
     end
+    counts[name] = [v4_lines, v6_lines]
+  end
+
+  # 合并表不得含重叠段，且条目数不会多于各家之和。
+  if (cn = counts.delete("cn"))
+    cn.zip(counts.values.transpose).each_with_index do |(lines, parts), i|
+      file = %w[result/cnv4.txt result/cnv6.txt][i]
+      sum = (parts || []).sum(&:length)
+      failures << "#{file}: #{lines.length} prefixes > #{sum} in the per-operator lists" if lines.length > sum
+      ranges = lines.map do |line|
+        IPAddr.new(line).to_range
+      rescue StandardError
+        nil
+      end
+      ranges = ranges.compact.sort_by(&:begin)
+      overlap = ranges.each_cons(2).find { |a, b| b.begin <= a.end }
+      failures << "#{file}: overlapping prefixes #{overlap.map { |r| r.begin.to_s }.join(" / ")}" if overlap
+    end
   end
 
   unless failures.empty?
     failures.each { |f| warn "ERROR> #{f}" }
     exit 1
   end
-  warn "INFO> guard checks passed (#{operators.length} operators x 3 lists)"
+  warn "INFO> guard checks passed (#{lists.length} lists x 3 files)"
 
 # Summarize total IPv4/IPv6 address space per operator
 stat:
   #!/usr/bin/env ruby
   dir = "result"
   files = Dir.exist?(dir) ? Dir.glob("#{dir}/*.txt").sort : []
-  files.reject! { |p| p.end_with?("46.txt") }
+  files.reject! { |p| p.end_with?("46.txt", "v4v6.txt") }
   abort("result/*.txt files missing") if files.empty?
 
   report = files.map do |p|
@@ -262,13 +310,13 @@ package: guard
   require "digest"
   require "fileutils"
 
-  operators = IO.popen(["just", "published_operators"], &:read).split
-  abort("Failed to read published operators") unless $?.success?
+  lists = IO.popen(["just", "published_lists"], &:read).lines.map(&:split)
+  abort("Failed to read published lists") unless $?.success?
 
   FileUtils.rm_rf("dist")
   FileUtils.mkdir_p("dist")
 
-  assets = operators.flat_map { |op| %W[#{op}.txt #{op}6.txt #{op}46.txt] }
+  assets = lists.flat_map { |_name, *files| files }
   assets << "stat" if File.file?("result/stat")
   assets.each { |f| FileUtils.cp("result/#{f}", "dist/#{f}") }
 

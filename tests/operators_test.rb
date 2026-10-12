@@ -24,7 +24,7 @@ Dir.mktmpdir("china-operator-ip-operators") do |dir|
   ASN
   expected = {
     "cernet" => %w[4538 23910 23911],
-    "chinanet" => %w[4134 4847 38035 38270 59265],
+    "ctcc" => %w[4134 4847 38035 38270 59265],
     "cmcc" => %w[24311],
     "unicom" => %w[4837 18344],
     "cstnet" => %w[7497],
@@ -45,7 +45,19 @@ Dir.mktmpdir("china-operator-ip-operators") do |dir|
   output, status = Open3.capture2("just", "published_operators", chdir: dir)
   abort("Failed to get published operators") unless status.success?
   published = output.split
-  abort("Expected only the three ISPs, got #{published}") unless published == %w[chinanet cmcc unicom]
+  abort("Expected only the three ISPs, got #{published}") unless published == %w[cmcc ctcc unicom]
+
+  # 发布的列表与文件名是对外契约，cn 是三家的合并表。
+  output, status = Open3.capture2("just", "published_lists", chdir: dir)
+  abort("Failed to get published lists") unless status.success?
+  lists = output.lines.map(&:split)
+  expected_lists = [
+    %w[cmcc cmcc.txt cmcc6.txt cmcc46.txt],
+    %w[ctcc ctcc.txt ctcc6.txt ctcc46.txt],
+    %w[unicom unicom.txt unicom6.txt unicom46.txt],
+    %w[cn cnv4.txt cnv6.txt cnv4v6.txt],
+  ]
+  abort("Expected lists #{expected_lists}, got #{lists}") unless lists == expected_lists
 
   # 边界运营商不得生成列表。
   _out, err, status = Open3.capture3("just", "gen", "cernet", chdir: dir)

@@ -22,6 +22,17 @@ pub(crate) type IpRanges = DualStack<IpRange<Ipv4Net>, IpRange<Ipv6Net>>;
 pub(crate) type AsnRanges = DualStack<AsnRangeMap<Ipv4Net>, AsnRangeMap<Ipv6Net>>;
 
 impl IpRanges {
+    /// Union of `prefixes`: duplicates, nested and adjacent prefixes collapse into
+    /// the fewest CIDRs that cover exactly the same addresses.
+    pub(crate) fn union(prefixes: &[IpNet]) -> Self {
+        let mut ranges = Self::default();
+        for prefix in prefixes {
+            ranges.add_prefix(*prefix);
+        }
+        ranges.simplify();
+        ranges
+    }
+
     fn add_prefix(&mut self, prefix: IpNet) {
         match prefix {
             IpNet::V4(net) => {
@@ -34,11 +45,7 @@ impl IpRanges {
     }
 
     pub(crate) fn add_unannounced(&mut self, announced: &Self, prefixes: &[IpNet]) {
-        let mut fallback = Self::default();
-        for prefix in prefixes {
-            fallback.add_prefix(*prefix);
-        }
-        fallback.simplify();
+        let fallback = Self::union(prefixes);
 
         for net in fallback.v4.exclude(&announced.v4).iter() {
             self.v4.add(net);
@@ -365,6 +372,28 @@ mod tests {
                 Ipv4Net::from_str("10.0.1.0/24").unwrap(),
                 Ipv4Net::from_str("10.0.2.0/24").unwrap(),
             ]
+        );
+    }
+
+    #[test]
+    fn union_drops_duplicate_nested_and_adjacent_prefixes() {
+        let prefixes: Vec<IpNet> = [
+            "10.0.0.0/24",
+            "10.0.0.0/24",
+            "10.0.0.128/25",
+            "10.0.1.0/24",
+            "10.0.3.0/24",
+            "2001:db8::/32",
+            "2001:db8:1::/48",
+            "2001:db9::/32",
+        ]
+        .iter()
+        .map(|prefix| prefix.parse().unwrap())
+        .collect();
+
+        assert_eq!(
+            IpRanges::union(&prefixes).lines(),
+            ["10.0.0.0/23", "10.0.3.0/24", "2001:db8::/31"]
         );
     }
 
