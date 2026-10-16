@@ -40,6 +40,21 @@ prepare_autnums:
   rm -f autnums.html
   echo "INFO> asnames.txt updated ($(wc -l < asnames.txt) entries)" >&2
 
+# Download the latest APNIC delegated stats and verify its published MD5
+prepare_apnic:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  url="https://ftp.apnic.net/stats/apnic/delegated-apnic-latest"
+  aria2c -s 4 -x 4 -q -o delegated-apnic-latest --allow-overwrite=true "${url}"
+  expected="$(curl -fsSL "${url}.md5" | awk '{print $NF}')"
+  actual="$(md5sum delegated-apnic-latest | cut -d' ' -f1)"
+  if [[ "${expected}" != "${actual}" ]]; then
+    echo "delegated-apnic-latest MD5 mismatch: expected ${expected}, got ${actual}" >&2
+    exit 1
+  fi
+  echo "INFO> delegated-apnic-latest ready ($(grep -c '|CN|ipv' delegated-apnic-latest) CN records)" >&2
+
 # Download the latest RIB snapshot for a collector
 prepare_rib collector:
   #!/usr/bin/env bash
@@ -74,7 +89,7 @@ prepare_ribs: (prepare_rib "rrc00") (prepare_rib "rrc21") (prepare_rib "rrc12") 
 
 # Prepare data for generation
 [parallel]
-prepare: prepare_autnums prepare_ribs
+prepare: prepare_autnums prepare_apnic prepare_ribs
 
 # Print raw ASN candidates for OPERATOR based on operators.yaml
 get_asn_candidates_raw operator:
@@ -187,25 +202,24 @@ all:
     exit($?.exitstatus || 1) unless system("just", "gen", operator)
   end
 
-# Merge every published operator's lists into cnv4 / cnv6 / cnv4v6, without overlaps
+# Build cnv4 / cnv6 / cnv4v6 from every CN block in APNIC delegated stats, without overlaps
 cn:
   #!/usr/bin/env ruby
-  operators = IO.popen(["just", "published_operators"], &:read).split
-  abort("Failed to read published operators") unless $?.success?
+  require "fileutils"
 
-  inputs = operators.map { |op| "result/#{op}46.txt" }
-  missing = inputs.reject { |f| File.file?(f) }
-  abort("Missing #{missing.join(", ")}. Run 'just all' first.") unless missing.empty?
+  src = "delegated-apnic-latest"
+  abort("Missing #{src}. Run 'just prepare_apnic' first.") unless File.size?(src)
 
-  # 重叠、嵌套、相邻的段由分类器合并成最少的 CIDR，见 docs/adr/ADR-0001-*.md。
+  # 整个中国大陆的地址，含教育网等非三大运营商网络，见 docs/adr/ADR-0002-*.md。
+  FileUtils.mkdir_p("result")
   out, v4, v6 = %w[result/cnv4v6.txt result/cnv4.txt result/cnv6.txt]
-  merge = ["target/release/china-operator-ip"] + inputs.flat_map { |f| ["--merge-prefix-file", f] }
-  abort("Failed to merge #{inputs.join(", ")}") unless system(*merge, out: out)
+  merge = %W[target/release/china-operator-ip --merge-delegated-file #{src} --delegated-country CN]
+  abort("Failed to build the cn lists from #{src}") unless system(*merge, out: out)
 
   v6_lines, v4_lines = File.readlines(out).partition { |line| line.include?(":") }
   File.write(v4, v4_lines.join)
   File.write(v6, v6_lines.join)
-  warn "INFO> cn done from #{operators.join("+")} (v4=#{v4_lines.length} v6=#{v6_lines.length})"
+  warn "INFO> cn done from APNIC delegated stats (v4=#{v4_lines.length} v6=#{v6_lines.length})"
 
 # Print "<list> <v4 file> <v6 file> <v4+v6 file>" for every published list
 published_lists:
@@ -259,12 +273,10 @@ guard:
     counts[name] = [v4_lines, v6_lines]
   end
 
-  # 合并表不得含重叠段，且条目数不会多于各家之和。
+  # cn 表不得含重叠段。
   if (cn = counts.delete("cn"))
-    cn.zip(counts.values.transpose).each_with_index do |(lines, parts), i|
+    cn.each_with_index do |lines, i|
       file = %w[result/cnv4.txt result/cnv6.txt][i]
-      sum = (parts || []).sum(&:length)
-      failures << "#{file}: #{lines.length} prefixes > #{sum} in the per-operator lists" if lines.length > sum
       ranges = lines.map do |line|
         IPAddr.new(line).to_range
       rescue StandardError

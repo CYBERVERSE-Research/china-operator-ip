@@ -29,7 +29,8 @@
 
 | 编号 | 标题 | 状态 |
 |------|------|------|
-| [ADR-0001](adr/ADR-0001-rename-ctcc-and-add-cn-union.md) | 电信列表改名为 ctcc，并新增三家合并表 cn | 已批准 |
+| [ADR-0001](adr/ADR-0001-rename-ctcc-and-add-cn-union.md) | 电信列表改名为 ctcc，并新增三家合并表 cn（cn 部分被 ADR-0002 取代） | 已批准 |
+| [ADR-0002](adr/ADR-0002-cn-from-apnic-delegated.md) | cn 合并表改为取 APNIC delegated 统计里的全部 CN 地址 | 已批准 |
 
 ## 方案设计
 

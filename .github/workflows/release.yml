@@ -64,7 +64,7 @@ jobs:
           set -euo pipefail
           {
             echo "按中国电信、中国移动、中国联通分类的 IP 列表，由 BGP RIB 快照生成。"
-            echo "\`cn\` 是三家的并集，重叠与相邻的段已合并。"
+            echo "\`cn\` 是 APNIC delegated 统计中的全部中国（CN）地址，含教育网等，重叠与相邻的段已合并。"
             echo
             echo "| 列表 | IPv4 | IPv6 | IPv4+IPv6 |"
             echo "|---|---|---|---|"

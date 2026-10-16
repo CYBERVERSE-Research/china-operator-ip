@@ -1,6 +1,7 @@
 mod asn;
 mod cache;
 mod classifier;
+mod delegated;
 mod ip;
 
 use asn::{Asn, DomesticPolicy, foreign_upstream_only, load_countries, load_set};
@@ -51,6 +52,19 @@ struct Opts {
     )]
     merge_prefix_file: Vec<PathBuf>,
 
+    /// Add the COUNTRY blocks of these RIR delegated-stats files to the merge output.
+    #[arg(
+        long,
+        value_name = "FILE",
+        action = ArgAction::Append,
+        requires = "delegated_country",
+        conflicts_with_all = ["mrt_files", "asns"]
+    )]
+    merge_delegated_file: Vec<PathBuf>,
+
+    #[arg(long, value_name = "COUNTRY", requires = "merge_delegated_file")]
+    delegated_country: Option<String>,
+
     #[arg(long, value_name = "FILE")]
     asn_country_file: Option<PathBuf>,
 
@@ -71,12 +85,25 @@ struct Opts {
 
 fn main() {
     let opts = Opts::parse();
-    if !opts.merge_prefix_file.is_empty() {
+    if !opts.merge_prefix_file.is_empty() || !opts.merge_delegated_file.is_empty() {
         let mut prefixes = Vec::new();
         for path in &opts.merge_prefix_file {
             prefixes.extend(load_prefixes(path).unwrap_or_else(|err| {
                 panic!("failed to load prefixes from {}: {err}", path.display())
             }));
+        }
+        let country = opts.delegated_country.as_deref().unwrap_or_default();
+        for path in &opts.merge_delegated_file {
+            let file = File::open(path).map(BufReader::new);
+            prefixes.extend(
+                file.and_then(|file| delegated::load(file, country))
+                    .unwrap_or_else(|err| {
+                        panic!(
+                            "failed to load delegated stats from {}: {err}",
+                            path.display()
+                        )
+                    }),
+            );
         }
         for line in IpRanges::union(&prefixes).lines() {
             println!("{line}");
@@ -269,6 +296,44 @@ mod tests {
             args.extend(conflicting);
             assert!(Opts::try_parse_from(args).is_err());
         }
+    }
+
+    #[test]
+    fn delegated_merge_needs_a_country_but_no_rib_or_asn() {
+        let opts = Opts::try_parse_from([
+            "china-operator-ip",
+            "--merge-delegated-file",
+            "delegated-apnic-latest",
+            "--delegated-country",
+            "CN",
+        ])
+        .unwrap();
+        assert_eq!(
+            opts.merge_delegated_file,
+            [PathBuf::from("delegated-apnic-latest")]
+        );
+        assert_eq!(opts.delegated_country.as_deref(), Some("CN"));
+
+        assert!(
+            Opts::try_parse_from([
+                "china-operator-ip",
+                "--merge-delegated-file",
+                "delegated-apnic-latest",
+            ])
+            .is_err()
+        );
+        assert!(
+            Opts::try_parse_from([
+                "china-operator-ip",
+                "--merge-delegated-file",
+                "delegated-apnic-latest",
+                "--delegated-country",
+                "CN",
+                "--mrt-file",
+                "rib.gz",
+            ])
+            .is_err()
+        );
     }
 
     #[test]

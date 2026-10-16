@@ -1,6 +1,6 @@
 # 发布流程
 
-> 最后更新 2026-10-06 ｜ 代码基线 cc80d20 ｜ 验证程度 已在 Actions 完整跑通（run 37416578982，发布 v2026.10.06）
+> 最后更新 2026-10-16 ｜ 代码基线 fa1927b ｜ 验证程度 已读代码（APNIC cn 待 dry run 验证）
 
 十二张 IP 列表由 `.github/workflows/release.yml` 每三天生成并发布为 Release 资产。
 **不手动发版，也不把结果写回任何分支。**
@@ -24,14 +24,14 @@
 ```
 checkout → binstall + just → 缓存 ~/.cargo/bin → 确认 aria2
   → just dependency      构建分类器，装 bgpkit-broker 0.7.0
-  → just                 prepare（autnums + 4 份 RIB）→ all（三家 × 三张表）→ cn（三家合并）→ stat
+  → just                 prepare（autnums + APNIC delegated + 4 份 RIB）→ all（三家 × 三张表）→ cn（APNIC 全部 CN）→ stat
   → just package         guard 校验 → 汇总到 dist/ → 生成 SHA256SUMS
   → 解析 tag → 生成 release notes → gh release create
 ```
 
 `just guard` 的校验项：每个列表的三张表都存在、IPv4 条数 ≥ 500、IPv6 条数 ≥ 50、
 v4+v6 表行数等于 v4 + v6、每行都是对应地址族的合法 CIDR；`cn` 另外要求表内没有
-重叠段、条目数不多于三家之和。任一项不过就终止，不会发布。
+重叠段。任一项不过就终止，不会发布。
 
 ## 三、手动触发
 
@@ -56,7 +56,8 @@ gh run watch
 | `guard` 报 `malformed prefixes` | 分类器输出了非法 CIDR | 是 `src/` 的 bug，开 issue，不要跳过校验发布 |
 | `guard` 报 `46 lines !=` / `v4v6.txt: ... lines !=` | v4/v6 拆分与合表不一致 | 看 `justfile` 的 `gen` / `cn` 配方拆分逻辑 |
 | `guard` 报 `overlapping prefixes` | `cn` 合并没去重 | 是 `src/ip.rs` (`IpRanges::union`) 的 bug，不要跳过校验发布 |
-| `Missing result/<op>46.txt. Run 'just all' first.` | 单独跑了 `just cn` | 先 `just all` |
+| `delegated-apnic-latest MD5 mismatch` | 下载期间 APNIC 刚好更新了文件，或下载损坏 | 重跑；持续失败检查 `ftp.apnic.net` |
+| `Missing delegated-apnic-latest` | 单独跑了 `just cn` | 先 `just prepare_apnic` |
 | `gh release create` 403 | workflow 缺 `contents: write` | 检查 `release.yml` 的 `permissions` |
 | tag 已存在 | 同日重复发布 | 正常，会自动退化成 `vYYYY.MM.DD-HHMM` |
 | 发布成功但资产少于 14 个 | `package` 漏了文件 | 对照 `just published_lists` 的输出与 `dist/` |
@@ -65,7 +66,7 @@ gh run watch
 
 ```bash
 just dependency
-just              # prepare → all → cn → stat，需要网络，要下载 4 份 RIB 快照
+just              # prepare → all → cn → stat，需要网络，要下载 APNIC delegated 与 4 份 RIB 快照
 just guard
 just package
 ls -l dist/

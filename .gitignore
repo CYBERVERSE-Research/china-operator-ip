@@ -4,6 +4,7 @@ autnums.html
 rib.*
 rib6.*
 rib-*
+delegated-*
 result/
 dist/
 release-notes.md
