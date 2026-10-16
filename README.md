@@ -39,15 +39,15 @@ https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/downloa
 
 ## 本地生成
 
-依赖：[just](https://github.com/casey/just)、[Rust 工具链](https://www.rust-lang.org/tools/install)、[bgpkit-broker](https://github.com/bgpkit/bgpkit-broker) `0.7.0`、[aria2](https://github.com/aria2/aria2)、[Ruby](https://www.ruby-lang.org)、jq。
+依赖：[just](https://github.com/casey/just)、[Rust 工具链](https://www.rust-lang.org/tools/install)、[bgpkit-broker](https://github.com/bgpkit/bgpkit-broker) `0.7.0`、[aria2](https://github.com/aria2/aria2)、curl、[Ruby](https://www.ruby-lang.org)、jq。
 
 ```sh
 just dependency   # 构建分类器并安装 bgpkit-broker
-just              # 下载数据 → 生成列表 → 统计
+just              # 下载 ASN 名称、APNIC delegated 统计与 RIB 快照 → 生成列表 → 统计
 just --list       # 查看所有命令
 ```
 
-BGP 分类器的 Rust 源码在 `src/`，直接读取本地 `rib-*` 快照。
+BGP 分类器的 Rust 源码在 `src/`，直接读取本地 `rib-*` 快照；`cn` 由同一程序从本地 `delegated-apnic-latest` 生成（`just prepare_apnic` 下载并校验 MD5）。
 
 ## 参与开发
 
