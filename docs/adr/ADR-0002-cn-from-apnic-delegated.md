@@ -4,7 +4,7 @@
 负责人: @skylineconnct
 最后更新: 2026-10-16
 代码基线: fa1927b
-验证程度: 已跑测试
+验证程度: 已完整生成验证
 关联代码: src/delegated.rs (load), src/main.rs (merge_delegated_file), justfile (prepare_apnic, cn, guard)
 关联决策: ADR-0001
 ---
@@ -65,7 +65,7 @@ gh workflow run Release -f dry_run=true --ref feat/cn-from-apnic-delegated
 gh run watch   # 日志里应有 "INFO> cn done from APNIC delegated stats"
 ```
 
-【未验证】直到空跑 run 链接贴进 PR。
+已验证：空跑 run 38848937988 通过，`cn` v4=5497 / v6=2018 条，`guard` 全部通过。
 
 ## 回滚
 
