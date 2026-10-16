@@ -1,6 +1,6 @@
 # china-operator-ip
 
-依据 BGP 路由数据生成中国三大运营商的 IP 地址列表。
+依据 BGP 路由数据生成中国三大运营商的 IP 地址列表，并依据 APNIC 登记数据生成全中国 IP 列表。
 
 ## 收录范围
 
@@ -9,9 +9,9 @@
 | 中国电信 | `ctcc` | `ctcc.txt` | `ctcc6.txt` | `ctcc46.txt` |
 | 中国移动 | `cmcc` | `cmcc.txt` | `cmcc6.txt` | `cmcc46.txt` |
 | 中国联通 | `unicom` | `unicom.txt` | `unicom6.txt` | `unicom46.txt` |
-| 三家合并 | `cn` | `cnv4.txt` | `cnv6.txt` | `cnv4v6.txt` |
+| 全中国 | `cn` | `cnv4.txt` | `cnv6.txt` | `cnv4v6.txt` |
 
-`cn` 是三家列表的并集：重复、嵌套与相邻的段已合并，表内任意两条 CIDR 都不重叠。
+`cn` 取自 APNIC [delegated 统计](https://ftp.apnic.net/stats/apnic/delegated-apnic-latest)中家码为 `CN` 的全部已分配地址，包含教育网等非三大运营商网络；不含港澳台。重复、嵌套与相邻的段已合并，表内任意两条 CIDR 都不重叠。见 [ADR-0002](docs/adr/ADR-0002-cn-from-apnic-delegated.md)。
 
 > 中国电信的标识在 2026-10 由 `chinanet` 改为 `ctcc`，此后的发布不再包含 `chinanet*.txt`，见 [ADR-0001](docs/adr/ADR-0001-rename-ctcc-and-add-cn-union.md)。
 
@@ -35,19 +35,19 @@ https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/downloa
 
 `operators.yaml` 中 `publish: false` 的条目（教育网、科技网、鹏博士、谷歌中国）不生成列表，只作为上述停止边界；删除它们会使这些网络经电信、联通转接的地址被错误归入三大运营商列表。
 
-同一前缀若由多个 origin ASN 宣告，仍可能同时出现在多张表中，三家列表之间不保证互斥；`cn` 合并时只保留一份。完整规则见 [分类算法](docs/algorithm.md)。
+同一前缀若由多个 origin ASN 宣告，仍可能同时出现在多张表中，三家列表之间不保证互斥。`cn` 不使用上述规则。完整规则见 [分类算法](docs/algorithm.md)。
 
 ## 本地生成
 
-依赖：[just](https://github.com/casey/just)、[Rust 工具链](https://www.rust-lang.org/tools/install)、[bgpkit-broker](https://github.com/bgpkit/bgpkit-broker) `0.7.0`、[aria2](https://github.com/aria2/aria2)、[Ruby](https://www.ruby-lang.org)、jq。
+依赖：[just](https://github.com/casey/just)、[Rust 工具链](https://www.rust-lang.org/tools/install)、[bgpkit-broker](https://github.com/bgpkit/bgpkit-broker) `0.7.0`、[aria2](https://github.com/aria2/aria2)、curl、[Ruby](https://www.ruby-lang.org)、jq。
 
 ```sh
 just dependency   # 构建分类器并安装 bgpkit-broker
-just              # 下载数据 → 生成列表 → 统计
+just              # 下载 ASN 名称、APNIC delegated 统计与 RIB 快照 → 生成列表 → 统计
 just --list       # 查看所有命令
 ```
 
-BGP 分类器的 Rust 源码在 `src/`，直接读取本地 `rib-*` 快照。
+BGP 分类器的 Rust 源码在 `src/`，直接读取本地 `rib-*` 快照；`cn` 由同一程序从本地 `delegated-apnic-latest` 生成（`just prepare_apnic` 下载并校验 MD5）。
 
 ## 参与开发
 

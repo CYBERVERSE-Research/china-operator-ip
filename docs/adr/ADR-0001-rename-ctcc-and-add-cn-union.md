@@ -11,6 +11,9 @@
 
 # ADR-0001 电信列表改名为 ctcc，并新增三家合并表 cn
 
+> `cn` 的数据来源已由 [ADR-0002](ADR-0002-cn-from-apnic-delegated.md) 改为 APNIC
+> delegated 统计；本文关于 `cn` 是三家并集的部分不再成立，改名部分仍有效。
+
 ## 背景
 
 维护者要求两件事（2026-10-12）：

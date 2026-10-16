@@ -3,7 +3,7 @@
 ## 这个项目做什么
 
 读取 BGP RIB 快照，按 AS_PATH 把 IPv4/IPv6 前缀归属到中国三大运营商，输出十二张
-CIDR 列表（电信 `ctcc`、移动 `cmcc`、联通 `unicom`、三家合并 `cn` × IPv4 / IPv6 /
+CIDR 列表（电信 `ctcc`、移动 `cmcc`、联通 `unicom`、全中国 `cn`（取自 APNIC delegated 统计）× IPv4 / IPv6 /
 IPv4+IPv6）。结果由 GitHub Actions 每三天发布为 Release 资产，**不写回任何分支**。
 
 项目由 <https://www.skylineconnct.io> 维护，fork 自他人的公开项目，当前仓库是
@@ -134,7 +134,7 @@ just package    # 汇总到 dist/ 并生成 SHA256SUMS
 | 名字 | 触发 | 做什么 |
 |------|------|--------|
 | `CI` | PR → `main`、push → `main` | `sanitize` 与 `test` 两个 job，PR 门禁 |
-| `Release` | cron `0 2 */3 * *`、手动 | 完整生成（含 `cn` 合并）→ `guard` → `package` → 创建 Release |
+| `Release` | cron `0 2 */3 * *`、手动 | 完整生成（含 APNIC `cn`）→ `guard` → `package` → 创建 Release |
 
 `Release` 手动触发支持 `dry_run=true`：完整生成并校验，但不创建 Release。
 

@@ -47,7 +47,7 @@ Dir.mktmpdir("china-operator-ip-operators") do |dir|
   published = output.split
   abort("Expected only the three ISPs, got #{published}") unless published == %w[cmcc ctcc unicom]
 
-  # 发布的列表与文件名是对外契约，cn 是三家的合并表。
+  # 发布的列表与文件名是对外契约，cn 是 APNIC 登记的全部中国地址。
   output, status = Open3.capture2("just", "published_lists", chdir: dir)
   abort("Failed to get published lists") unless status.success?
   lists = output.lines.map(&:split)
