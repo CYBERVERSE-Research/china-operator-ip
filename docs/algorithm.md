@@ -4,7 +4,7 @@
 负责人: @skylineconnct
 最后更新: 2026-10-23
 代码基线: 41c5840
-验证程度: 已跑测试
+验证程度: 已完整生成验证
 关联代码: src/classifier.rs, src/asn.rs, src/ip.rs
 关联决策: ADR-0003
 ---

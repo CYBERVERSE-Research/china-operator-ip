@@ -106,7 +106,8 @@ peer 中本来就一边倒（`123.59.0.0/19` 的联通 origin 在 RIS 只占少�
   运营商表里（`cn` 不受影响）。
 - 可见度依赖 collector 集合：`prepare_ribs` 换 collector 或某个 RIB 下载不全，都会
   改变 peer 数。调整 N 要重新测量并改本 ADR。
-- 每个 (前缀, origin) 多存一个计数，单次分类耗时实测见验证方式。
+- 每个 (前缀, origin) 多存一个计数。`Generate IP lists` 步骤从 117 秒（run 39739930004，
+  `v2026.10.22`）变为 152 秒（run 39962884739），其中含 RIB 下载时间，不全是分类开销。
 
 ## 待确认（阻塞项）
 
@@ -124,7 +125,15 @@ gh run watch
 #   INFO> guard checks passed (4 lists x 3 files)
 ```
 
-已验证：门槛测量见上文 run 39960826084；最终配置的空跑结果见 PR 描述。
+已验证：门槛测量见上文 run 39960826084；最终配置的空跑
+[39962884739](https://github.com/CYBERVERSE-Research/china-operator-ip/actions/runs/39962884739)
+（提交 `db8dc23`）通过，`guard` 的两两不重叠检查通过，`stat` 与测量预期逐个一致：
+
+| 列表 | IPv4 地址 | IPv6 /48 | 日志里的 `outranked by` |
+|---|---|---|---|
+| `ctcc` | 131,989,504 | 340,110,107 | 0 ASNs |
+| `unicom` | 72,455,936（= 73,561,344 − 1,105,408） | 33,554,067 | 486 ASNs |
+| `cmcc` | 41,348,352（= 41,455,872 − 107,520） | 562,297,966 | 530 ASNs |
 
 ## 回滚
 
