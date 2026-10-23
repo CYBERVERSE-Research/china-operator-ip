@@ -1,5 +1,8 @@
 set unstable
 
+# 一个 origin 至少要被这么多个 RIB peer 看到才参与归属，见 docs/adr/ADR-0003-exclusive-operator-lists.md。
+min_origin_peers := "2"
+
 default: prepare all cn stat
 
 # Run every pre-merge check (desensitization review first)
@@ -153,6 +156,30 @@ published_operators:
     .select { |_, cfg| cfg.fetch("publish") }
     .keys.sort.each { |operator| puts operator }
 
+# Print the ASNs of every published operator that outranks OPERATOR in operators.yaml
+outranking_asns operator:
+  #!/usr/bin/env ruby
+  require "set"
+  require "yaml"
+
+  operator = "{{operator}}"
+  cfg = YAML.load_file("operators.yaml")
+  published = cfg.fetch("operators").select { |_, op| op.fetch("publish") }.keys.sort
+  priority = cfg.fetch("priority")
+  unless priority.sort == published
+    abort("priority must list every published operator exactly once: got #{priority}, published #{published}")
+  end
+  rank = priority.index(operator)
+  abort("#{operator} is not a published operator") unless rank
+
+  asns = Set.new
+  priority.take(rank).each do |higher|
+    output = IO.popen(["just", "get_asn_candidates", higher], &:read)
+    abort("Failed to get ASNs for #{higher}") unless $?.success?
+    asns.merge(output.split)
+  end
+  asns.sort_by(&:to_i).each { |asn| puts asn }
+
 # Generate the IPv4, IPv6 and IPv4+IPv6 lists for a single operator
 gen operator:
   #!/usr/bin/env ruby
@@ -174,15 +201,23 @@ gen operator:
   operator_asn_path = "result/.operator-asns.txt"
   File.write(operator_asn_path, operator_asns)
 
+  # 同时归属多家的段只留给 priority 靠前的运营商。
+  outranking = IO.popen(["just", "outranking_asns", operator], &:read)
+  abort("Failed to get the operators that outrank #{operator}") unless $?.success?
+  outranking_path = "result/.outranking-asns-#{operator}.txt"
+  File.write(outranking_path, outranking)
+
   classifier = [
     "target/release/china-operator-ip",
     "--ignore-private-asn",
     "--cache",
     "--operator-asn-file", operator_asn_path,
+    "--min-origin-peers", "{{min_origin_peers}}",
+    "--higher-priority-asn-file", outranking_path,
   ]
   classifier += ribs.flat_map { |r| ["--mrt-file", r] }
 
-  warn "INFO> #{operator} start"
+  warn "INFO> #{operator} start (min origin peers {{min_origin_peers}}, outranked by #{outranking.split.length} ASNs)"
   asns = IO.popen(["just", "get_asn_candidates", operator], &:read)
   abort("Failed to get ASN list for #{operator}") unless $?.success?
   abort("Failed to run BGP classifier for #{operator}") unless system(*classifier, *asns.split, out: out)
@@ -286,6 +321,23 @@ guard:
       overlap = ranges.each_cons(2).find { |a, b| b.begin <= a.end }
       failures << "#{file}: overlapping prefixes #{overlap.map { |r| r.begin.to_s }.join(" / ")}" if overlap
     end
+  end
+
+  # 三家运营商列表两两不重叠：同时归属多家的段只留给 priority 靠前的一家。
+  %w[IPv4 IPv6].each_with_index do |family, i|
+    ranges = counts.flat_map do |name, lines|
+      lines[i].filter_map do |line|
+        [IPAddr.new(line).to_range, name]
+      rescue StandardError
+        nil
+      end
+    end
+    ranges.sort_by! { |range, _| range.begin }
+    overlap = ranges.each_cons(2).find { |(a, _), (b, _)| b.begin <= a.end }
+    next unless overlap
+
+    (_, first), (second_range, second) = overlap
+    failures << "#{family}: #{first} and #{second} overlap at #{second_range.begin}"
   end
 
   unless failures.empty?

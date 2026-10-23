@@ -120,6 +120,9 @@ just package    # 汇总到 dist/ 并生成 SHA256SUMS
   `get_asn_candidates`，后者又调 `get_asn_candidates_raw`。所以 `just` 必须在
   `PATH` 里，`tests/operators_test.rb` 在临时目录里跑也依赖这一点。
 - **`just gen <边界运营商>` 会直接失败**，这是故意的，见铁律三。
+- **三家列表互不重叠靠 `operators.yaml` 的 `priority`**（电信 > 联通 > 移动）。它必须
+  恰好列出全部 `publish: true` 的运营商，否则 `just gen` 直接失败；`guard` 拦住任何
+  两家重叠。顺序与 `justfile` 顶部的 `min_origin_peers` 都是 ADR-0003 的决策，改前先改 ADR。
 - **`cron: '0 2 */3 * *'` 不是严格的 72 小时**。`*/3` 按"日"推进，月末到下月
   1 日的间隔可能是 1~3 天。需要严格等间隔要换成另一种实现，先写 ADR。
 - **`guard` 的下限只用于拦截整体失败**（分类器产出为空），不是用来跟踪真实前缀

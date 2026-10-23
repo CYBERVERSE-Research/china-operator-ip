@@ -7,7 +7,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Display;
 use std::hash::Hash;
 use std::net::{Ipv4Addr, Ipv6Addr};
-use vec_collections::VecSet;
+use vec_collections::{AbstractVecSet, VecSet};
 
 type Origins = VecSet<[Asn; 4]>;
 type AsnRangeMap<N> = HashMap<Asn, IpRange<N>>;
@@ -53,6 +53,12 @@ impl IpRanges {
         for net in fallback.v6.exclude(&announced.v6).iter() {
             self.v6.add(net);
         }
+    }
+
+    /// Drop every address that `other` also covers.
+    pub(crate) fn remove(&mut self, other: &Self) {
+        self.v4 = self.v4.exclude(&other.v4);
+        self.v6 = self.v6.exclude(&other.v6);
     }
 
     pub(crate) fn simplify(&mut self) {
@@ -171,6 +177,7 @@ struct FamilyTable<N: AddressFamily> {
     prefixes: PrefixMap<N, Origins>,
     announced: IpRange<N>,
     common_suffixes: HashMap<N, HashMap<Asn, AsPath>>,
+    peers: HashMap<(N, Asn), u32>,
     split_points: BTreeSet<N::Addr>,
 }
 
@@ -180,6 +187,7 @@ impl<N: AddressFamily> Default for FamilyTable<N> {
             prefixes: PrefixMap::new(),
             announced: IpRange::new(),
             common_suffixes: HashMap::new(),
+            peers: HashMap::new(),
             split_points: BTreeSet::new(),
         }
     }
@@ -213,9 +221,16 @@ impl<N: AddressFamily> FamilyTable<N> {
         }
     }
 
+    fn observe(&mut self, net: N, origin: Asn) {
+        *self.peers.entry((net, origin)).or_default() += 1;
+    }
+
     fn merge(&mut self, other: Self, allowed_origins: Option<&HashSet<Asn>>) {
         for net in other.announced.iter() {
             self.announced.add(net);
+        }
+        for (key, peers) in other.peers {
+            *self.peers.entry(key).or_default() += peers;
         }
         for (net, origins) in other.prefixes {
             let entry = self.prefixes.entry(net).or_insert_with(Origins::empty);
@@ -236,6 +251,31 @@ impl<N: AddressFamily> FamilyTable<N> {
             }
         }
         self.split_points.extend(other.split_points);
+    }
+
+    fn drop_low_visibility(&mut self, min_peers: u32) {
+        let mut visible: HashMap<N, Origins> = HashMap::new();
+        for ((net, origin), peers) in std::mem::take(&mut self.peers) {
+            let origins = visible.entry(net).or_insert_with(Origins::empty);
+            if peers >= min_peers {
+                origins.insert(origin);
+            }
+        }
+        for (net, origins) in visible {
+            if origins.is_empty() {
+                // Unlike a filtered origin, a barely seen announcement must not
+                // block the covering prefix: that one still owns the space.
+                self.prefixes.remove(&net);
+                self.common_suffixes.remove(&net);
+                continue;
+            }
+            if let Some(entry) = self.prefixes.get_mut(&net) {
+                entry.retain(|asn| origins.contains(asn));
+            }
+            if let Some(suffixes) = self.common_suffixes.get_mut(&net) {
+                suffixes.retain(|asn, _| origins.contains(asn));
+            }
+        }
     }
 
     fn add_shared_upstreams(&mut self, operator_asns: &HashSet<Asn>) {
@@ -302,9 +342,23 @@ impl MrtTables {
         }
     }
 
+    /// Count one more peer that sees `prefix` originated by `origin`.
+    pub(crate) fn observe(&mut self, prefix: IpNet, origin: Asn) {
+        match prefix {
+            IpNet::V4(net) => self.families.v4.observe(net, origin),
+            IpNet::V6(net) => self.families.v6.observe(net, origin),
+        }
+    }
+
     pub(crate) fn merge(&mut self, other: Self, allowed_origins: Option<&HashSet<Asn>>) {
         self.families.v4.merge(other.families.v4, allowed_origins);
         self.families.v6.merge(other.families.v6, allowed_origins);
+    }
+
+    /// Forget origins seen by fewer than `min_peers` peers across all RIBs.
+    pub(crate) fn drop_low_visibility(&mut self, min_peers: u32) {
+        self.families.v4.drop_low_visibility(min_peers);
+        self.families.v6.drop_low_visibility(min_peers);
     }
 
     pub(crate) fn add_shared_upstreams(&mut self, operator_asns: &HashSet<Asn>) {
@@ -500,6 +554,74 @@ mod tests {
         for transit in transits {
             assert!(!ranges.contains(&transit));
         }
+    }
+
+    fn observed_tables(observations: &[(&str, u32, u32)]) -> MrtTables {
+        let mut tables = MrtTables::default();
+        for &(prefix, origin, peers) in observations {
+            let prefix: IpNet = prefix.parse().unwrap();
+            tables.classify(prefix, &HashSet::from([origin.into()]), None);
+            for _ in 0..peers {
+                tables.observe(prefix, origin.into());
+            }
+        }
+        tables
+    }
+
+    fn lines_of(ranges: &AsnRanges, asn: u32) -> Vec<String> {
+        let mut selected = ranges.select(&HashSet::from([asn.into()]), &HashSet::new());
+        selected.simplify();
+        selected.lines()
+    }
+
+    #[test]
+    fn more_specific_from_another_origin_splits_the_aggregate() {
+        let tables = observed_tables(&[("192.0.2.0/24", 64496, 1), ("192.0.2.0/25", 64497, 1)]);
+        let (ranges, _) = tables.into_ranges();
+        assert_eq!(lines_of(&ranges, 64496), ["192.0.2.128/25"]);
+        assert_eq!(lines_of(&ranges, 64497), ["192.0.2.0/25"]);
+    }
+
+    #[test]
+    fn barely_seen_origin_loses_a_multi_origin_prefix() {
+        let mut tables = observed_tables(&[
+            ("192.0.2.0/24", 64496, 3),
+            ("192.0.2.0/24", 64497, 2),
+            ("2001:db8::/32", 64496, 3),
+            ("2001:db8::/32", 64497, 2),
+        ]);
+        tables.drop_low_visibility(3);
+        let (ranges, _) = tables.into_ranges();
+        assert_eq!(lines_of(&ranges, 64496), ["192.0.2.0/24", "2001:db8::/32"]);
+        assert!(!ranges.contains(&64497.into()));
+    }
+
+    #[test]
+    fn barely_seen_more_specific_falls_back_to_the_covering_prefix() {
+        let mut tables = observed_tables(&[("192.0.2.0/24", 64496, 3), ("192.0.2.0/25", 64497, 1)]);
+        tables.drop_low_visibility(3);
+        let (ranges, _) = tables.into_ranges();
+        assert_eq!(lines_of(&ranges, 64496), ["192.0.2.0/24"]);
+        assert!(!ranges.contains(&64497.into()));
+    }
+
+    #[test]
+    fn single_peer_threshold_keeps_every_observed_origin() {
+        let mut tables = observed_tables(&[("192.0.2.0/24", 64496, 5), ("192.0.2.0/24", 64497, 1)]);
+        tables.drop_low_visibility(1);
+        let (ranges, _) = tables.into_ranges();
+        for asn in [64496, 64497] {
+            assert_eq!(lines_of(&ranges, asn), ["192.0.2.0/24"]);
+        }
+    }
+
+    #[test]
+    fn peer_counts_add_up_across_ribs() {
+        let mut tables = observed_tables(&[("192.0.2.0/24", 64496, 2)]);
+        tables.merge(observed_tables(&[("192.0.2.0/24", 64496, 1)]), None);
+        tables.drop_low_visibility(3);
+        let (ranges, _) = tables.into_ranges();
+        assert_eq!(lines_of(&ranges, 64496), ["192.0.2.0/24"]);
     }
 
     fn fallback_result(announced: &[&str], fallbacks: &[&str]) -> IpRanges {

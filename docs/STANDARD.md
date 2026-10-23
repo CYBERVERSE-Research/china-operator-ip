@@ -2,7 +2,7 @@
 文档类型: 文档规范
 状态: 已批准
 负责人: @skylineconnct
-最后更新: 2026-10-06
+最后更新: 2026-10-23
 代码基线: cc80d20
 验证程度: 已读代码
 关联代码: 无
@@ -72,7 +72,7 @@ harness 把每个命令文件的**开头文本**当作该 slash command 的描�
 最后更新: 2026-10-06
 代码基线: cc80d20
 验证程度: 已读代码 | 已跑测试 | 已完整生成验证
-关联代码: src/classifier.rs:57 (build)
+关联代码: src/classifier.rs:60 (build)
 关联决策: ADR-0001 | 无
 ---
 ```
@@ -87,7 +87,7 @@ harness 把每个命令文件的**开头文本**当作该 slash command 的描�
 只写行号的引用一定会烂。必须补一个可以 grep 回来的符号：
 
 ```
-src/classifier.rs:57 (build)
+src/classifier.rs:60 (build)
 ```
 
 核对命令：
@@ -166,7 +166,7 @@ grep -nE '^(pub(\([a-z]+\))? )?(fn|struct|enum|impl|const|static)\b.*\bbuild\b' 
 ## 六、书写约定
 
 - 正文中文，标识符/路径/CIDR/配置键一律英文原样，不翻译。
-- 引用代码一律 `src/classifier.rs:57 (build)` 形式，可点击。
+- 引用代码一律 `src/classifier.rs:60 (build)` 形式，可点击。
 - 代码里反向引用文档：`# 见 docs/algorithm.md#processing-steps`。
 - 表格优先于长段落；判定逻辑一律写成「条件 → 动作」表。
 - 冻结代码在文档和代码注释里都标 `【冻结】`，并写明解冻条件（用户显式批准）。

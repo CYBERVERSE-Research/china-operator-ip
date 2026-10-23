@@ -47,3 +47,10 @@ operators:
     name: '谷歌中国'
     country: 'CN'
     pattern: 'AS24424'
+
+# 同一段地址同时归属多家发布运营商时，只留给排在前面的那家，三张表因此互不
+# 重叠。必须恰好列出全部 publish: true 的运营商。见 docs/adr/ADR-0003-exclusive-operator-lists.md。
+priority:
+  - ctcc
+  - unicom
+  - cmcc
