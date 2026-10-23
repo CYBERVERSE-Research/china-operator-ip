@@ -1,5 +1,8 @@
 # china-operator-ip
 
+[![CI](https://github.com/CYBERVERSE-Research/china-operator-ip/actions/workflows/ci.yml/badge.svg)](https://github.com/CYBERVERSE-Research/china-operator-ip/actions/workflows/ci.yml)
+[![Release](https://github.com/CYBERVERSE-Research/china-operator-ip/actions/workflows/release.yml/badge.svg)](https://github.com/CYBERVERSE-Research/china-operator-ip/actions/workflows/release.yml)
+
 依据 BGP 路由数据生成中国三大运营商的 IP 地址列表，并依据 APNIC 登记数据生成全中国 IP 列表。
 
 ## 收录范围
@@ -32,6 +35,14 @@ https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/downloa
 ```
 
 把 `ctcc` 换成 `cmcc` 或 `unicom` 即可取其余列表；合并表取 `cnv4.txt`、`cnv6.txt`、`cnv4v6.txt`。生成结果不写入任何分支。
+
+每次发布的 tag 是 `vYYYY.MM.DD`（UTC 日期，同日重复发布追加 `-HHMM`）。需要固定在某一版时，把 `latest/download` 换成 `download/<tag>`，例如：
+
+```
+https://github.com/CYBERVERSE-Research/china-operator-ip/releases/download/v2026.10.23/ctcc.txt
+```
+
+Release 说明里列出每张表的 CIDR 条目数；下载后可用 `sha256sum -c SHA256SUMS` 校验。
 
 ## 使用建议
 
