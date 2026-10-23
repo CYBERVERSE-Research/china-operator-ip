@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 
-# runner 固定为 ubuntu-24.04：test job 直接用镜像预装的 ruby。见 ADR-0004。
+# runner 固定为 ubuntu-26.04：test job 直接用镜像预装的 ruby；缓存键带上 ImageOS。见 ADR-0005。
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -18,7 +18,7 @@ concurrency:
 jobs:
   sanitize:
     name: sanitize
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
       - name: Desensitization review
@@ -26,14 +26,19 @@ jobs:
 
   test:
     name: test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
       - uses: extractions/setup-just@v4
+      - name: Identify runner image
+        id: image
+        run: |
+          echo "os=${ImageOS:?not set; this job expects a GitHub-hosted runner}" >> "$GITHUB_OUTPUT"
+          echo "${ImageOS} ${ImageVersion:-}"; ruby --version; cargo --version
       - uses: actions/cache@v6
         with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          key: ${{ runner.os }}-${{ steps.image.outputs.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-${{ steps.image.outputs.os }}-cargo-
           path: |
             ~/.cargo/registry
             ~/.cargo/git
