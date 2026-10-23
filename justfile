@@ -1,6 +1,6 @@
 set unstable
 
-default: prepare all cn stat
+default: prepare visibility_experiment all cn stat
 
 # Run every pre-merge check (desensitization review first)
 check: sanitize
@@ -191,6 +191,32 @@ gen operator:
   File.write(v4, v4_lines.join)
   File.write(v6, v6_lines.join)
   warn "INFO> #{operator} done (v4=#{v4_lines.length} v6=#{v6_lines.length})"
+
+# TEMPORARY: measure --min-origin-peers candidates (removed before the PR)
+visibility_experiment:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  mkdir -p result/exp
+  just operator_asns > result/exp/operators.txt
+  for op in ctcc unicom cmcc; do just get_asn_candidates "$op" > "result/exp/$op.asns"; done
+  ribs=()
+  for r in rib-*.gz rib-*.bz2; do
+    if [[ -e "$r" ]]; then ribs+=(--mrt-file "$r"); fi
+  done
+  for c in rrc00 rrc21 rrc12 route-views6; do
+    echo "INFO> $c peers: $(bgpkit-broker peers -c "$c" --json 2>/dev/null | jq length 2>/dev/null || true)"
+  done
+  thresholds="1 2 3 5 10 20 50"
+  for n in $thresholds; do
+    start=$(date +%s)
+    for op in ctcc unicom cmcc; do
+      target/release/china-operator-ip --ignore-private-asn --cache \
+        --operator-asn-file result/exp/operators.txt --min-origin-peers "$n" \
+        "${ribs[@]}" $(cat "result/exp/$op.asns") > "result/exp/$op-$n.txt"
+    done
+    echo "INFO> threshold $n took $(( $(date +%s) - start ))s"
+  done
+  python3 scripts/visibility-experiment.py result/exp $thresholds
 
 # Generate the lists for every published operator
 all:
