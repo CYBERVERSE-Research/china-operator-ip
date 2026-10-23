@@ -576,10 +576,10 @@ mod tests {
 
     #[test]
     fn more_specific_from_another_origin_splits_the_aggregate() {
-        let tables = observed_tables(&[("10.0.0.0/16", 64496, 1), ("10.0.0.0/17", 64497, 1)]);
+        let tables = observed_tables(&[("192.0.2.0/24", 64496, 1), ("192.0.2.0/25", 64497, 1)]);
         let (ranges, _) = tables.into_ranges();
-        assert_eq!(lines_of(&ranges, 64496), ["10.0.128.0/17"]);
-        assert_eq!(lines_of(&ranges, 64497), ["10.0.0.0/17"]);
+        assert_eq!(lines_of(&ranges, 64496), ["192.0.2.128/25"]);
+        assert_eq!(lines_of(&ranges, 64497), ["192.0.2.0/25"]);
     }
 
     #[test]
@@ -598,10 +598,10 @@ mod tests {
 
     #[test]
     fn barely_seen_more_specific_falls_back_to_the_covering_prefix() {
-        let mut tables = observed_tables(&[("10.0.0.0/16", 64496, 3), ("10.0.0.0/17", 64497, 1)]);
+        let mut tables = observed_tables(&[("192.0.2.0/24", 64496, 3), ("192.0.2.0/25", 64497, 1)]);
         tables.drop_low_visibility(3);
         let (ranges, _) = tables.into_ranges();
-        assert_eq!(lines_of(&ranges, 64496), ["10.0.0.0/16"]);
+        assert_eq!(lines_of(&ranges, 64496), ["192.0.2.0/24"]);
         assert!(!ranges.contains(&64497.into()));
     }
 
