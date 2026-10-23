@@ -1,6 +1,6 @@
 # 发布流程
 
-> 最后更新 2026-10-16 ｜ 代码基线 fa1927b ｜ 验证程度 已读代码（APNIC cn 待 dry run 验证）
+> 最后更新 2026-10-23 ｜ 代码基线 41c5840 ｜ 验证程度 已读代码（三家互斥待 dry run 验证）
 
 十二张 IP 列表由 `.github/workflows/release.yml` 每三天生成并发布为 Release 资产。
 **不手动发版，也不把结果写回任何分支。**
@@ -31,7 +31,7 @@ checkout → binstall + just → 缓存 ~/.cargo/bin → 确认 aria2
 
 `just guard` 的校验项：每个列表的三张表都存在、IPv4 条数 ≥ 500、IPv6 条数 ≥ 50、
 v4+v6 表行数等于 v4 + v6、每行都是对应地址族的合法 CIDR；`cn` 另外要求表内没有
-重叠段。任一项不过就终止，不会发布。
+重叠段；三家运营商列表两两之间不得有重叠段（ADR-0003）。任一项不过就终止，不会发布。
 
 ## 三、手动触发
 
@@ -56,6 +56,9 @@ gh run watch
 | `guard` 报 `malformed prefixes` | 分类器输出了非法 CIDR | 是 `src/` 的 bug，开 issue，不要跳过校验发布 |
 | `guard` 报 `46 lines !=` / `v4v6.txt: ... lines !=` | v4/v6 拆分与合表不一致 | 看 `justfile` 的 `gen` / `cn` 配方拆分逻辑 |
 | `guard` 报 `overlapping prefixes` | `cn` 合并没去重 | 是 `src/ip.rs` (`IpRanges::union`) 的 bug，不要跳过校验发布 |
+| `guard` 报 `IPv4: <a> and <b> overlap at <地址>` | 优先级去重没生效 | 看 `gen` 日志的 `outranked by N ASNs`：`ctcc` 应为 0，`unicom`、`cmcc` 应大于 0。计数正常就是 `src/classifier.rs` (`result`) 的 bug，不要跳过校验发布 |
+| `priority must list every published operator` | 增删了 `publish: true` 的运营商却没改 `priority` | 改 `operators.yaml` 的 `priority`，顺序变化要先写 ADR |
+| 某家列表的地址量相比上一次发布骤降 | `min_origin_peers` 过高，或某个 collector 的 RIB 只下载到一部分、peer 数变少 | 先对比 `gen` 日志与上一次发布的 `stat`；不要为了凑数随手调门槛，调整要先改 ADR-0003 |
 | `delegated-apnic-latest MD5 mismatch` | 下载期间 APNIC 刚好更新了文件，或下载损坏 | 重跑；持续失败检查 `ftp.apnic.net` |
 | `Missing delegated-apnic-latest` | 单独跑了 `just cn` | 先 `just prepare_apnic` |
 | `gh release create` 403 | workflow 缺 `contents: write` | 检查 `release.yml` 的 `permissions` |

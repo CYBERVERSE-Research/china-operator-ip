@@ -2,7 +2,7 @@
 文档类型: 文档索引
 状态: 已批准
 负责人: @skylineconnct
-最后更新: 2026-10-06
+最后更新: 2026-10-23
 代码基线: cc80d20
 验证程度: 已读代码
 关联代码: 无
@@ -21,7 +21,7 @@
 
 | 文档 | 状态 | 一句话 |
 |------|------|-------|
-| [分类算法](algorithm.md) | 已实施 | 八个步骤的逐步说明；改 `src/` 或 `operators.yaml` 的归属语义前先看这里 |
+| [分类算法](algorithm.md) | 已实施 | 十个步骤的逐步说明；改 `src/` 或 `operators.yaml` 的归属语义前先看这里 |
 
 ## 决策记录（ADR）
 
@@ -31,6 +31,7 @@
 |------|------|------|
 | [ADR-0001](adr/ADR-0001-rename-ctcc-and-add-cn-union.md) | 电信列表改名为 ctcc，并新增三家合并表 cn（cn 部分被 ADR-0002 取代） | 已批准 |
 | [ADR-0002](adr/ADR-0002-cn-from-apnic-delegated.md) | cn 合并表改为取 APNIC delegated 统计里的全部 CN 地址 | 已批准 |
+| [ADR-0003](adr/ADR-0003-exclusive-operator-lists.md) | 用可见度门槛与固定优先级让三家运营商列表互不重叠 | 已批准 |
 
 ## 方案设计
 

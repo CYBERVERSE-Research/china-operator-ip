@@ -47,6 +47,30 @@ Dir.mktmpdir("china-operator-ip-operators") do |dir|
   published = output.split
   abort("Expected only the three ISPs, got #{published}") unless published == %w[cmcc ctcc unicom]
 
+  # 同一段地址只留给 priority 靠前的运营商：电信 > 联通 > 移动。
+  # 见 docs/adr/ADR-0003-exclusive-operator-lists.md。
+  outranking = {
+    "ctcc" => [],
+    "unicom" => expected["ctcc"],
+    "cmcc" => (expected["ctcc"] + expected["unicom"]).sort_by(&:to_i),
+  }
+  outranking.each do |operator, asns|
+    output, status = Open3.capture2("just", "outranking_asns", operator, chdir: dir)
+    abort("Failed to get the operators that outrank #{operator}") unless status.success?
+    abort("#{operator}: expected to be outranked by #{asns}, got #{output.split}") unless output.split == asns
+  end
+  _out, _err, status = Open3.capture3("just", "outranking_asns", "cernet", chdir: dir)
+  abort("'just outranking_asns cernet' should fail for a boundary-only operator") if status.success?
+
+  # priority 漏掉任何一家发布运营商都必须直接失败，不能让那家的列表与别家重叠。
+  Dir.mktmpdir("china-operator-ip-priority") do |bad|
+    FileUtils.cp(["#{dir}/justfile", "#{dir}/asnames.txt"], bad)
+    File.write("#{bad}/operators.yaml", File.read("#{dir}/operators.yaml").sub(/^  - cmcc\n/, ""))
+    _out, err, status = Open3.capture3("just", "outranking_asns", "unicom", chdir: bad)
+    abort("A priority list without cmcc should fail") if status.success?
+    abort("Unexpected failure reason: #{err}") unless err.include?("priority must list")
+  end
+
   # 发布的列表与文件名是对外契约，cn 是 APNIC 登记的全部中国地址。
   output, status = Open3.capture2("just", "published_lists", chdir: dir)
   abort("Failed to get published lists") unless status.success?

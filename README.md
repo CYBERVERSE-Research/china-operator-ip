@@ -14,6 +14,8 @@
 `cn` 取自 APNIC [delegated 统计](https://ftp.apnic.net/stats/apnic/delegated-apnic-latest)中家码为 `CN` 的全部已分配地址，包含教育网等非三大运营商网络；不含港澳台。重复、嵌套与相邻的段已合并，表内任意两条 CIDR 都不重叠。见 [ADR-0002](docs/adr/ADR-0002-cn-from-apnic-delegated.md)。
 
 > 中国电信的标识在 2026-10 由 `chinanet` 改为 `ctcc`，此后的发布不再包含 `chinanet*.txt`，见 [ADR-0001](docs/adr/ADR-0001-rename-ctcc-and-add-cn-union.md)。
+>
+> ADR-0003 合入之后的发布中，三家运营商列表互不重叠；此前的发布（含 `v2026.10.22`）两两重叠的 IPv4 地址合计约 213 万个，见 [ADR-0003](docs/adr/ADR-0003-exclusive-operator-lists.md)。
 
 列表为 CIDR 格式，每行一条，IPv4 与 IPv6 各自按地址排序。`stat` 给出每张表覆盖的地址总量，`SHA256SUMS` 给出资产校验值。
 
@@ -35,7 +37,9 @@ https://github.com/CYBERVERSE-Research/china-operator-ip/releases/latest/downloa
 
 `operators.yaml` 中 `publish: false` 的条目（教育网、科技网、鹏博士、谷歌中国）不生成列表，只作为上述停止边界；删除它们会使这些网络经电信、联通转接的地址被错误归入三大运营商列表。
 
-同一前缀若由多个 origin ASN 宣告，仍可能同时出现在多张表中，三家列表之间不保证互斥。`cn` 不使用上述规则。完整规则见 [分类算法](docs/algorithm.md)。
+三家列表互不重叠。一段地址若同时归属多家（多线 BGP 机房、云厂商的段常由两家运营商的 ASN 同时宣告），只归入优先级最高的一家：**电信 > 联通 > 移动**（`operators.yaml` 的 `priority`）。只被 1 个 BGP 观测点看到的宣告不参与归属，免得一条只泄漏给个别观测点的路由把地址分给另一家。
+
+`cn` 不使用上述规则。完整规则见 [分类算法](docs/algorithm.md)。
 
 ## 本地生成
 
