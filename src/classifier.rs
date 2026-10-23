@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 pub(crate) struct ClassifierConfig {
     pub(crate) ignore_private_asn: bool,
     pub(crate) origin_only: bool,
+    pub(crate) min_origin_peers: u32,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -25,9 +26,11 @@ impl Classification {
         &self,
         targets: &HashSet<Asn>,
         excluded: &HashSet<Asn>,
+        outranked_by: &HashSet<Asn>,
         fallback_prefixes: &[IpNet],
     ) -> IpRanges {
         let mut result = self.ranges.select(targets, excluded);
+        result.remove(&self.ranges.select(outranked_by, &HashSet::new()));
         result.add_unannounced(&self.announced, fallback_prefixes);
         result.simplify();
         result
@@ -81,6 +84,7 @@ pub(crate) fn build(
         }
     }
 
+    tables.drop_low_visibility(config.min_origin_peers);
     if !config.origin_only {
         tables.add_shared_upstreams(operator_asns);
     }
@@ -103,10 +107,18 @@ fn process_mrt_file(
     let mut tables = MrtTables::default();
     let mut domestic_origins = HashSet::new();
     let mut direct_upstreams = DirectUpstreams::new();
+    // A RIB dump lists every peer's route to a prefix together, so a peer that
+    // repeats with ADD-PATH is caught within the current prefix.
+    let mut current_prefix = None;
+    let mut counted_peers = HashSet::new();
 
     for elem in parser.into_elem_iter() {
         if elem.elem_type != ElemType::ANNOUNCE {
             continue;
+        }
+        if current_prefix != Some(elem.prefix.prefix) {
+            current_prefix = Some(elem.prefix.prefix);
+            counted_peers.clear();
         }
         tables.announce(&elem.prefix.prefix);
 
@@ -116,6 +128,11 @@ fn process_mrt_file(
         let origin_asns: HashSet<Asn> = origins.iter().map(|asn| Asn::from(asn.to_u32())).collect();
         if config.ignore_private_asn && origin_asns.iter().any(|asn| asn.is_private()) {
             continue;
+        }
+        for origin in &origin_asns {
+            if counted_peers.insert((elem.peer_ip, *origin)) {
+                tables.observe(elem.prefix.prefix, *origin);
+            }
         }
 
         let full_path = elem
@@ -200,6 +217,7 @@ mod tests {
         let config = ClassifierConfig {
             ignore_private_asn: true,
             origin_only: false,
+            min_origin_peers: 1,
         };
         let classification = build(
             std::slice::from_ref(&path),
@@ -221,20 +239,35 @@ mod tests {
         for asn in [origin, nearest_operator] {
             assert_eq!(
                 classification
-                    .result(&HashSet::from([asn.into()]), &HashSet::new(), &[])
+                    .result(
+                        &HashSet::from([asn.into()]),
+                        &HashSet::new(),
+                        &HashSet::new(),
+                        &[]
+                    )
                     .lines(),
                 ["198.51.100.0/24"]
             );
         }
         assert!(
             classification
-                .result(&HashSet::from([transit.into()]), &HashSet::new(), &[])
+                .result(
+                    &HashSet::from([transit.into()]),
+                    &HashSet::new(),
+                    &HashSet::new(),
+                    &[]
+                )
                 .lines()
                 .is_empty()
         );
         assert_eq!(
             origin_only
-                .result(&HashSet::from([origin.into()]), &HashSet::new(), &[])
+                .result(
+                    &HashSet::from([origin.into()]),
+                    &HashSet::new(),
+                    &HashSet::new(),
+                    &[]
+                )
                 .lines(),
             ["198.51.100.0/24"]
         );
@@ -242,6 +275,7 @@ mod tests {
             origin_only
                 .result(
                     &HashSet::from([nearest_operator.into()]),
+                    &HashSet::new(),
                     &HashSet::new(),
                     &[]
                 )
@@ -284,6 +318,7 @@ mod tests {
             ClassifierConfig {
                 ignore_private_asn: true,
                 origin_only: false,
+                min_origin_peers: 1,
             },
             None,
             &operator_asns,
@@ -293,15 +328,115 @@ mod tests {
         }
         assert_eq!(
             classification
-                .result(&HashSet::from([origin.into()]), &HashSet::new(), &[])
+                .result(
+                    &HashSet::from([origin.into()]),
+                    &HashSet::new(),
+                    &HashSet::new(),
+                    &[]
+                )
                 .lines(),
             ["198.51.100.0/24"]
         );
         assert!(
             classification
-                .result(&operator_asns, &HashSet::new(), &[])
+                .result(&operator_asns, &HashSet::new(), &HashSet::new(), &[])
                 .lines()
                 .is_empty()
+        );
+    }
+
+    /// Classify one synthetic RIB in which peer N sees `routes[N]` as `(prefix, path)`.
+    fn classify_rib(
+        name: &str,
+        routes: &[(&str, &[u32])],
+        min_origin_peers: u32,
+    ) -> Classification {
+        let mut encoder = MrtRibEncoder::new();
+        for (peer, (prefix, path)) in routes.iter().enumerate() {
+            encoder.process_elem(&BgpElem {
+                timestamp: 1.0,
+                peer_ip: std::net::Ipv4Addr::new(192, 0, 2, peer as u8 + 1).into(),
+                peer_asn: path[0].into(),
+                prefix: prefix.parse().unwrap(),
+                as_path: Some(AsPath::from_sequence(path)),
+                ..Default::default()
+            });
+        }
+        let path = std::env::temp_dir().join(format!(
+            "china-operator-ip-{name}-{}.mrt",
+            std::process::id()
+        ));
+        std::fs::write(&path, encoder.export_bytes()).unwrap();
+        let classification = build(
+            std::slice::from_ref(&path),
+            ClassifierConfig {
+                ignore_private_asn: true,
+                origin_only: false,
+                min_origin_peers,
+            },
+            None,
+            &HashSet::new(),
+        );
+        std::fs::remove_file(path).unwrap();
+        classification
+    }
+
+    #[test]
+    fn origin_seen_by_too_few_peers_is_dropped() {
+        let (widely_seen, barely_seen) = (64496, 64497);
+        let routes: &[(&str, &[u32])] = &[
+            ("198.51.100.0/24", &[64500, widely_seen]),
+            ("198.51.100.0/24", &[64501, widely_seen]),
+            ("198.51.100.0/24", &[64502, barely_seen]),
+        ];
+        let lines = |classification: &Classification, asn: u32| {
+            classification
+                .result(
+                    &HashSet::from([asn.into()]),
+                    &HashSet::new(),
+                    &HashSet::new(),
+                    &[],
+                )
+                .lines()
+        };
+        let unfiltered = classify_rib("visibility-1", routes, 1);
+        let filtered = classify_rib("visibility-2", routes, 2);
+        for asn in [widely_seen, barely_seen] {
+            assert_eq!(lines(&unfiltered, asn), ["198.51.100.0/24"]);
+        }
+        assert_eq!(lines(&filtered, widely_seen), ["198.51.100.0/24"]);
+        assert!(lines(&filtered, barely_seen).is_empty());
+    }
+
+    #[test]
+    fn higher_priority_space_is_removed_from_the_result() {
+        let (first, second) = (64496, 64497);
+        let classification = classify_rib(
+            "priority",
+            &[
+                ("198.51.100.0/24", &[64500, first]),
+                ("198.51.100.0/24", &[64501, second]),
+                ("203.0.113.0/24", &[64502, second]),
+            ],
+            1,
+        );
+        let second_only = HashSet::from([second.into()]);
+        assert_eq!(
+            classification
+                .result(&second_only, &HashSet::new(), &HashSet::new(), &[])
+                .lines(),
+            ["198.51.100.0/24", "203.0.113.0/24"]
+        );
+        assert_eq!(
+            classification
+                .result(
+                    &second_only,
+                    &HashSet::new(),
+                    &HashSet::from([first.into()]),
+                    &[]
+                )
+                .lines(),
+            ["203.0.113.0/24"]
         );
     }
 }

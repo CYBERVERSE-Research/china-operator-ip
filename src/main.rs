@@ -34,6 +34,14 @@ struct Opts {
     #[arg(long, value_name = "FILE", conflicts_with = "origin_only")]
     operator_asn_file: Option<PathBuf>,
 
+    /// Ignore an origin of a prefix unless at least this many RIB peers see it.
+    #[arg(long, value_name = "PEERS", default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
+    min_origin_peers: u32,
+
+    /// Remove the space attributed to the ASNs in this file from the result.
+    #[arg(long, value_name = "FILE")]
+    higher_priority_asn_file: Option<PathBuf>,
+
     #[arg(long, default_value_t = false)]
     cache: bool,
 
@@ -124,6 +132,18 @@ fn main() {
             })
         })
         .unwrap_or_default();
+    let higher_priority_asns = opts
+        .higher_priority_asn_file
+        .as_deref()
+        .map(|path| {
+            load_set(path).unwrap_or_else(|err| {
+                panic!(
+                    "failed to load higher-priority ASNs from {}: {err}",
+                    path.display()
+                )
+            })
+        })
+        .unwrap_or_default();
     let domestic_policy = opts.trusted_cn_transit_file.as_deref().map(|trusted_path| {
         let country_path = opts
             .asn_country_file
@@ -134,10 +154,12 @@ fn main() {
     let config = ClassifierConfig {
         ignore_private_asn: opts.ignore_private_asn,
         origin_only: opts.origin_only,
+        min_origin_peers: opts.min_origin_peers,
     };
     let cache_key = CacheKey::new(
         opts.ignore_private_asn,
         opts.origin_only,
+        opts.min_origin_peers,
         domestic_policy.as_ref().map(DomesticPolicy::fingerprint),
         &operator_asns,
     );
@@ -215,7 +237,12 @@ fn main() {
         .unwrap_or_default();
     let excluded: HashSet<Asn> = foreign_upstream_only_asns.into_iter().collect();
     for line in classification
-        .result(&targets, &excluded, &fallback_prefixes)
+        .result(
+            &targets,
+            &excluded,
+            &higher_priority_asns,
+            &fallback_prefixes,
+        )
         .lines()
     {
         println!("{line}");
@@ -333,6 +360,18 @@ mod tests {
                 "rib.gz",
             ])
             .is_err()
+        );
+    }
+
+    #[test]
+    fn origin_peer_threshold_defaults_to_one_and_rejects_zero() {
+        let opts = Opts::try_parse_from(["china-operator-ip", "4134"]).unwrap();
+        assert_eq!(opts.min_origin_peers, 1);
+        let opts =
+            Opts::try_parse_from(["china-operator-ip", "--min-origin-peers", "5", "4134"]).unwrap();
+        assert_eq!(opts.min_origin_peers, 5);
+        assert!(
+            Opts::try_parse_from(["china-operator-ip", "--min-origin-peers", "0", "4134"]).is_err()
         );
     }
 

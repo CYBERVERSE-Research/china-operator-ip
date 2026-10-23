@@ -8,12 +8,13 @@ use std::hash::{Hash, Hasher};
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 
-const FORMAT_VERSION: u8 = 6;
+const FORMAT_VERSION: u8 = 7;
 
 #[derive(Clone, Copy, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub(crate) struct CacheKey {
     ignore_private_asn: bool,
     origin_only: bool,
+    min_origin_peers: u32,
     domestic_policy_fingerprint: Option<u64>,
     operator_asns_fingerprint: u64,
 }
@@ -22,6 +23,7 @@ impl CacheKey {
     pub(crate) fn new(
         ignore_private_asn: bool,
         origin_only: bool,
+        min_origin_peers: u32,
         domestic_policy_fingerprint: Option<u64>,
         operator_asns: &HashSet<Asn>,
     ) -> Self {
@@ -32,6 +34,7 @@ impl CacheKey {
         Self {
             ignore_private_asn,
             origin_only,
+            min_origin_peers,
             domestic_policy_fingerprint,
             operator_asns_fingerprint: hasher.finish(),
         }
@@ -85,8 +88,17 @@ mod tests {
     fn cache_path_changes_when_origin_only_changes() {
         let mrt_files = vec![PathBuf::from("rib-a.gz"), PathBuf::from("rib-b.gz")];
         assert_ne!(
-            CacheKey::new(false, false, None, &HashSet::new()).path(&mrt_files),
-            CacheKey::new(false, true, None, &HashSet::new()).path(&mrt_files)
+            CacheKey::new(false, false, 1, None, &HashSet::new()).path(&mrt_files),
+            CacheKey::new(false, true, 1, None, &HashSet::new()).path(&mrt_files)
+        );
+    }
+
+    #[test]
+    fn cache_path_changes_with_the_origin_peer_threshold() {
+        let mrt_files = vec![PathBuf::from("rib-a.gz")];
+        assert_ne!(
+            CacheKey::new(false, false, 1, None, &HashSet::new()).path(&mrt_files),
+            CacheKey::new(false, false, 3, None, &HashSet::new()).path(&mrt_files)
         );
     }
 
@@ -94,12 +106,12 @@ mod tests {
     fn cache_path_changes_with_domestic_policy() {
         let mrt_files = vec![PathBuf::from("rib-a.gz")];
         assert_ne!(
-            CacheKey::new(false, true, None, &HashSet::new()).path(&mrt_files),
-            CacheKey::new(false, true, Some(1), &HashSet::new()).path(&mrt_files)
+            CacheKey::new(false, true, 1, None, &HashSet::new()).path(&mrt_files),
+            CacheKey::new(false, true, 1, Some(1), &HashSet::new()).path(&mrt_files)
         );
         assert_ne!(
-            CacheKey::new(false, true, Some(1), &HashSet::new()).path(&mrt_files),
-            CacheKey::new(false, true, Some(2), &HashSet::new()).path(&mrt_files)
+            CacheKey::new(false, true, 1, Some(1), &HashSet::new()).path(&mrt_files),
+            CacheKey::new(false, true, 1, Some(2), &HashSet::new()).path(&mrt_files)
         );
     }
 
@@ -109,12 +121,12 @@ mod tests {
         let operators = HashSet::from([64496.into(), 64497.into()]);
         let reversed = HashSet::from([64497.into(), 64496.into()]);
         assert_eq!(
-            CacheKey::new(false, false, None, &operators).path(&mrt_files),
-            CacheKey::new(false, false, None, &reversed).path(&mrt_files)
+            CacheKey::new(false, false, 1, None, &operators).path(&mrt_files),
+            CacheKey::new(false, false, 1, None, &reversed).path(&mrt_files)
         );
         assert_ne!(
-            CacheKey::new(false, false, None, &operators).path(&mrt_files),
-            CacheKey::new(false, false, None, &HashSet::from([64496.into()])).path(&mrt_files)
+            CacheKey::new(false, false, 1, None, &operators).path(&mrt_files),
+            CacheKey::new(false, false, 1, None, &HashSet::from([64496.into()])).path(&mrt_files)
         );
     }
 }
