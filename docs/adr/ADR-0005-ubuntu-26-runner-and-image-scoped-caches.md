@@ -93,7 +93,24 @@ gh run watch
 切换前已删掉仓库全部 6 条 Actions 缓存（2026-10-24，共 614 MiB），其中 3 条属于已删除的 PR #5 分支与
 `refs/pull/5/merge`。新键下的第一次 run 是冷启动。
 
-结果见下表。
+已验证（提交 `0410003`，两次 run 先后跑完，间隔不到 10 分钟）：
+
+| run | 镜像 | 结果 | 注记 | 缓存 |
+|---|---|---|---|---|
+| Release dry run [39992359139](https://github.com/CYBERVERSE-Research/china-operator-ip/actions/runs/39992359139)（本分支） | Ubuntu 26.04.1，镜像 20261012.163.1，`ImageOS=ubuntu26`；ruby 3.3.8，cargo 1.99.0 | 成功，`guard` 通过 | 无 | 键 `Linux-ubuntu26-cargo-bin-6ba2eb87…`，冷启动 |
+| Release dry run [39992381245](https://github.com/CYBERVERSE-Research/china-operator-ip/actions/runs/39992381245)（对照，`main`） | Ubuntu 24.04.5，镜像 20261012.334.1 | 成功，`guard` 通过 | 无 | 键 `Linux-cargo-bin-6ba2eb87…`，冷启动 |
+
+两次 run 的输入一致（asnames 122956 条，APNIC CN 记录 10843 条），release notes 里的条目数逐项相同：
+
+| 列表 | IPv4 | IPv6 | IPv4+IPv6 |
+|---|---|---|---|
+| cmcc | 681 | 142 | 823 |
+| ctcc | 2488 | 444 | 2932 |
+| unicom | 1320 | 669 | 1989 |
+| cn | 5499 | 2018 | 7517 |
+
+日志不打印 RIB 地址与资产哈希，所以这里证明的是条目数相同，不是字节相同。`Generate IP lists` 步骤
+26.04 为 106 秒，24.04 为 148 秒；`just dependency` 在冷缓存下分别为 70 秒、76 秒。
 
 ## 回滚
 

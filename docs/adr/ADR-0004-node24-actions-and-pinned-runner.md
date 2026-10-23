@@ -2,14 +2,17 @@
 文档类型: 决策记录
 状态: 已批准
 负责人: @skylineconnct
-最后更新: 2026-10-23
+最后更新: 2026-10-24
 代码基线: 194562c
 验证程度: 已完整生成验证
 关联代码: .github/workflows/ci.yml, .github/workflows/release.yml
-关联决策: 无
+关联决策: ADR-0005
 ---
 
 # ADR-0004 把 Actions 升到 Node 24 版本，并把 runner 固定为 ubuntu-24.04
+
+> runner 已由 [ADR-0005](ADR-0005-ubuntu-26-runner-and-image-scoped-caches.md) 升到 `ubuntu-26.04`，
+> 缓存键改为区分镜像；本文关于固定镜像、不用 `ubuntu-latest` 的理由与 action 版本表仍有效。
 
 ## 背景
 

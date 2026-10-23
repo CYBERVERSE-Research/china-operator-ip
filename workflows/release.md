@@ -1,6 +1,6 @@
 # 发布流程
 
-> 最后更新 2026-10-23 ｜ 代码基线 194562c ｜ 验证程度 已完整生成验证（runner 与 action 升级：dry run 39971258592）
+> 最后更新 2026-10-24 ｜ 代码基线 6747eb0 ｜ 验证程度 已完整生成验证（runner 升到 26.04：dry run 39992359139）
 
 十二张 IP 列表由 `.github/workflows/release.yml` 每三天生成并发布为 Release 资产。
 **不手动发版，也不把结果写回任何分支。**
@@ -10,7 +10,7 @@
 | 项 | 值 |
 |---|---|
 | 触发 | cron `0 2 */3 * *`（UTC） |
-| 环境 | `ubuntu-24.04`（固定，不用 `ubuntu-latest`），action 均为 Node 24 版本，见 ADR-0004 |
+| 环境 | `ubuntu-26.04`（固定，不用 `ubuntu-latest`），见 ADR-0005；action 均为 Node 24 版本，见 ADR-0004 |
 | 耗时 | 实测 4.5 分钟（2026-10-06，run 37416578982）；job 超时 60 分钟 |
 | 重试 | 生成步骤最多 3 次，每次 30 分钟 |
 | Tag | `vYYYY.MM.DD`，同日重复发布追加 `-HHMM` |
@@ -23,7 +23,7 @@
 ## 二、步骤做了什么
 
 ```
-checkout → binstall + just → 缓存 ~/.cargo/bin → 确认 aria2
+checkout → binstall + just → 识别镜像（ImageOS）→ 缓存 ~/.cargo/bin → 确认 aria2
   → just dependency      构建分类器，装 bgpkit-broker 0.7.0
   → just                 prepare（autnums + APNIC delegated + 4 份 RIB）→ all（三家 × 三张表）→ cn（APNIC 全部 CN）→ stat
   → just package         guard 校验 → 汇总到 dist/ → 生成 SHA256SUMS
@@ -65,7 +65,8 @@ gh run watch
 | `gh release create` 403 | workflow 缺 `contents: write` | 检查 `release.yml` 的 `permissions` |
 | tag 已存在 | 同日重复发布 | 正常，会自动退化成 `vYYYY.MM.DD-HHMM` |
 | 注记出现 `Node.js 20 is deprecated` | 某个 action 又落后了 | 查该 action 的最新大版本与 `runs.using`，升级并更新 ADR-0004 的版本表 |
-| `ruby: command not found` 或 `bgpkit-broker` 启动报 glibc 错误 | runner 镜像变了 | 确认 `runs-on` 仍是 `ubuntu-24.04`；要换镜像先改 ADR-0004 |
+| `ruby: command not found` 或 `bgpkit-broker` 启动报 glibc 错误 | runner 镜像变了，或缓存键没带上镜像 | 确认 `runs-on` 是 `ubuntu-26.04`、缓存键里有 `steps.image.outputs.os`；要换镜像先写 ADR（现行 ADR-0005） |
+| `Identify runner image` 报 `ImageOS: not set` | 镜像不再设置 `ImageOS`，或换成了自托管 runner | 不要删掉这一步或退回不带镜像的键。改从别的来源取镜像标识（如 `/etc/os-release`），并更新 ADR-0005 |
 | 发布成功但资产少于 14 个 | `package` 漏了文件 | 对照 `just published_lists` 的输出与 `dist/` |
 
 ## 五、本地复现一次完整生成
