@@ -4,7 +4,7 @@
 负责人: @skylineconnct
 最后更新: 2026-10-23
 代码基线: 194562c
-验证程度: 已读代码
+验证程度: 已完整生成验证
 关联代码: .github/workflows/ci.yml, .github/workflows/release.yml
 关联决策: 无
 ---
@@ -73,7 +73,14 @@ gh run watch
 # 通过标准：run 成功；注记里不再有 "Node.js 20 is deprecated"；日志的 Operating System 为 Ubuntu 24.04
 ```
 
-CI 的两个 job 在本 PR 上运行即为验证。结果见 PR 描述。
+已验证（提交 `e7aaa49`）：
+
+| run | 结果 | 注记 | 环境 |
+|---|---|---|---|
+| Release dry run [39971258592](https://github.com/CYBERVERSE-Research/china-operator-ip/actions/runs/39971258592) | 成功，`guard` 通过，三家条目数与 `v2026.10.23` 相同 | 无 | Ubuntu 24.04.5；下载的是 cargo-binstall v1.25.2 |
+| CI [39971325345](https://github.com/CYBERVERSE-Research/china-operator-ip/actions/runs/39971325345) | `sanitize`、`test` 均通过 | 无 | Ubuntu 24.04.5 |
+
+`Generate IP lists` 步骤 145 秒（升级前的 run 39969438756 为 156 秒）。
 
 ## 回滚
 

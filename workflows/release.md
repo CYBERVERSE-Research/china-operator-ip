@@ -1,6 +1,6 @@
 # 发布流程
 
-> 最后更新 2026-10-23 ｜ 代码基线 194562c ｜ 验证程度 已完整生成验证（runner 与 action 升级待本 PR 的 dry run）
+> 最后更新 2026-10-23 ｜ 代码基线 194562c ｜ 验证程度 已完整生成验证（runner 与 action 升级：dry run 39971258592）
 
 十二张 IP 列表由 `.github/workflows/release.yml` 每三天生成并发布为 Release 资产。
 **不手动发版，也不把结果写回任何分支。**
