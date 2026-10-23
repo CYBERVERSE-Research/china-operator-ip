@@ -2,7 +2,7 @@
 文档类型: 文档索引
 状态: 已批准
 负责人: @skylineconnct
-最后更新: 2026-10-23
+最后更新: 2026-10-24
 代码基线: cc80d20
 验证程度: 已读代码
 关联代码: 无
@@ -32,7 +32,8 @@
 | [ADR-0001](adr/ADR-0001-rename-ctcc-and-add-cn-union.md) | 电信列表改名为 ctcc，并新增三家合并表 cn（cn 部分被 ADR-0002 取代） | 已批准 |
 | [ADR-0002](adr/ADR-0002-cn-from-apnic-delegated.md) | cn 合并表改为取 APNIC delegated 统计里的全部 CN 地址 | 已批准 |
 | [ADR-0003](adr/ADR-0003-exclusive-operator-lists.md) | 用可见度门槛与固定优先级让三家运营商列表互不重叠 | 已批准 |
-| [ADR-0004](adr/ADR-0004-node24-actions-and-pinned-runner.md) | 把 Actions 升到 Node 24 版本，并把 runner 固定为 ubuntu-24.04 | 已批准 |
+| [ADR-0004](adr/ADR-0004-node24-actions-and-pinned-runner.md) | 把 Actions 升到 Node 24 版本，并把 runner 固定为 ubuntu-24.04（runner 版本被 ADR-0005 取代） | 已批准 |
+| [ADR-0005](adr/ADR-0005-ubuntu-26-runner-and-image-scoped-caches.md) | 把 runner 升到 ubuntu-26.04，并让缓存键区分镜像 | 已批准 |
 
 ## 方案设计
 

@@ -22,8 +22,8 @@ concurrency:
 
 jobs:
   release:
-    # 固定镜像：配方依赖镜像预装的 ruby，~/.cargo/bin 缓存键也只区分 runner.os。见 ADR-0004。
-    runs-on: ubuntu-24.04
+    # 固定镜像：配方依赖镜像预装的 ruby；缓存键带上 ImageOS，不恢复别的镜像上装的二进制。见 ADR-0005。
+    runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -31,10 +31,15 @@ jobs:
         with:
           version: 1.25.2
       - uses: extractions/setup-just@v4
+      - name: Identify runner image
+        id: image
+        run: |
+          echo "os=${ImageOS:?not set; this job expects a GitHub-hosted runner}" >> "$GITHUB_OUTPUT"
+          echo "${ImageOS} ${ImageVersion:-}"; ruby --version; cargo --version
       - uses: actions/cache@v6
         with:
-          key: ${{ runner.os }}-cargo-bin-${{ hashFiles('justfile') }}
-          restore-keys: ${{ runner.os }}-cargo-bin-
+          key: ${{ runner.os }}-${{ steps.image.outputs.os }}-cargo-bin-${{ hashFiles('justfile') }}
+          restore-keys: ${{ runner.os }}-${{ steps.image.outputs.os }}-cargo-bin-
           path: ~/.cargo/bin
       - name: Ensure aria2 is available
         run: command -v aria2c || sudo apt-get install -y --no-install-recommends aria2

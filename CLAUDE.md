@@ -123,8 +123,9 @@ just package    # 汇总到 dist/ 并生成 SHA256SUMS
 - **三家列表互不重叠靠 `operators.yaml` 的 `priority`**（电信 > 联通 > 移动）。它必须
   恰好列出全部 `publish: true` 的运营商，否则 `just gen` 直接失败；`guard` 拦住任何
   两家重叠。顺序与 `justfile` 顶部的 `min_origin_peers` 都是 ADR-0003 的决策，改前先改 ADR。
-- **runner 固定为 `ubuntu-24.04`**，不是 `ubuntu-latest`：配方依赖镜像预装的 ruby，
-  `~/.cargo/bin` 缓存键只区分 `runner.os`。换镜像先改 ADR-0004。
+- **runner 固定为 `ubuntu-26.04`**，不是 `ubuntu-latest`：配方依赖镜像预装的 ruby。
+  缓存键带 `ImageOS`，否则不同镜像的 `runner.os` 都是 `Linux`，会恢复别的镜像上装的二进制。
+  换镜像先写 ADR（现行决策 ADR-0005）。
 - **`cron: '0 2 */3 * *'` 不是严格的 72 小时**。`*/3` 按"日"推进，月末到下月
   1 日的间隔可能是 1~3 天。需要严格等间隔要换成另一种实现，先写 ADR。
 - **`guard` 的下限只用于拦截整体失败**（分类器产出为空），不是用来跟踪真实前缀
