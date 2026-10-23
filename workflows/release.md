@@ -1,6 +1,6 @@
 # 发布流程
 
-> 最后更新 2026-10-23 ｜ 代码基线 41c5840 ｜ 验证程度 已完整生成验证（三家互斥：dry run 39962884739）
+> 最后更新 2026-10-23 ｜ 代码基线 194562c ｜ 验证程度 已完整生成验证（runner 与 action 升级待本 PR 的 dry run）
 
 十二张 IP 列表由 `.github/workflows/release.yml` 每三天生成并发布为 Release 资产。
 **不手动发版，也不把结果写回任何分支。**
@@ -10,6 +10,7 @@
 | 项 | 值 |
 |---|---|
 | 触发 | cron `0 2 */3 * *`（UTC） |
+| 环境 | `ubuntu-24.04`（固定，不用 `ubuntu-latest`），action 均为 Node 24 版本，见 ADR-0004 |
 | 耗时 | 实测 4.5 分钟（2026-10-06，run 37416578982）；job 超时 60 分钟 |
 | 重试 | 生成步骤最多 3 次，每次 30 分钟 |
 | Tag | `vYYYY.MM.DD`，同日重复发布追加 `-HHMM` |
@@ -63,6 +64,8 @@ gh run watch
 | `Missing delegated-apnic-latest` | 单独跑了 `just cn` | 先 `just prepare_apnic` |
 | `gh release create` 403 | workflow 缺 `contents: write` | 检查 `release.yml` 的 `permissions` |
 | tag 已存在 | 同日重复发布 | 正常，会自动退化成 `vYYYY.MM.DD-HHMM` |
+| 注记出现 `Node.js 20 is deprecated` | 某个 action 又落后了 | 查该 action 的最新大版本与 `runs.using`，升级并更新 ADR-0004 的版本表 |
+| `ruby: command not found` 或 `bgpkit-broker` 启动报 glibc 错误 | runner 镜像变了 | 确认 `runs-on` 仍是 `ubuntu-24.04`；要换镜像先改 ADR-0004 |
 | 发布成功但资产少于 14 个 | `package` 漏了文件 | 对照 `just published_lists` 的输出与 `dist/` |
 
 ## 五、本地复现一次完整生成

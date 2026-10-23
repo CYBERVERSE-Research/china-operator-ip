@@ -9,6 +9,8 @@ on:
 permissions:
   contents: read
 
+# runner 固定为 ubuntu-24.04：test job 直接用镜像预装的 ruby。见 ADR-0004。
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -16,19 +18,19 @@ concurrency:
 jobs:
   sanitize:
     name: sanitize
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Desensitization review
         run: ./scripts/sanitize.sh
 
   test:
     name: test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: extractions/setup-just@v3
-      - uses: actions/cache@v5
+      - uses: actions/checkout@v7
+      - uses: extractions/setup-just@v4
+      - uses: actions/cache@v6
         with:
           key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-

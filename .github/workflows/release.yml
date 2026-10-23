@@ -22,13 +22,16 @@ concurrency:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    # 固定镜像：配方依赖镜像预装的 ruby，~/.cargo/bin 缓存键也只区分 runner.os。见 ADR-0004。
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
-      - uses: cargo-bins/cargo-binstall@main
-      - uses: extractions/setup-just@v3
-      - uses: actions/cache@v5
+      - uses: actions/checkout@v7
+      - uses: cargo-bins/cargo-binstall@v1.25.2
+        with:
+          version: 1.25.2
+      - uses: extractions/setup-just@v4
+      - uses: actions/cache@v6
         with:
           key: ${{ runner.os }}-cargo-bin-${{ hashFiles('justfile') }}
           restore-keys: ${{ runner.os }}-cargo-bin-
@@ -38,7 +41,7 @@ jobs:
 
       - run: just dependency
       - name: Generate IP lists
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 30
           max_attempts: 3
